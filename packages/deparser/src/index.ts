@@ -1,3 +1,1 @@
-import Deparser from './deparser';
-const deparse = Deparser.deparse;
-export { deparse, Deparser };
+export { deparse, Deparser } from "./deparser";
