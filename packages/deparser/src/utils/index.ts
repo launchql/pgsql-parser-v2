@@ -35,20 +35,27 @@ export const transform = (obj: any, props: any): any => {
   if (obj instanceof Object || typeof obj === 'object') {
     copy = {};
     for (const attr in obj) {
-      if (obj.hasOwnProperty(attr)) {
-        if (props.hasOwnProperty(attr)) {
+      if (Object.prototype.hasOwnProperty.call(obj, attr)) {
+        if (Object.prototype.hasOwnProperty.call(props, attr)) {
           if (typeof props[attr] === 'function') {
-            copy[attr] = props[attr](obj[attr]);
-          } else if (props[attr].hasOwnProperty(obj[attr])) {
+            const val = props[attr](obj[attr]);
+            if (val !== undefined) {
+              copy[attr] = val;
+            }
+          } else if (Object.prototype.hasOwnProperty.call(props[attr], obj[attr])) {
             copy[attr] = props[attr][obj[attr]];
           } else {
-            copy[attr] = transform(obj[attr], props);
+            const val = transform(obj[attr], props);
+            if (val !== undefined) {
+              copy[attr] = val;
+            }
           }
         } else {
-          copy[attr] = transform(obj[attr], props);
+          const val = transform(obj[attr], props);
+          if (val !== undefined) {
+            copy[attr] = val;
+          }
         }
-      } else {
-        copy[attr] = transform(obj[attr], props);
       }
     }
     return copy;
