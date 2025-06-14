@@ -938,7 +938,7 @@ export class Deparser implements DeparserVisitor {
   CreateStmt(node: t.CreateStmt['CreateStmt'], context: DeparserContext): string {
     const output: string[] = ['CREATE'];
 
-    const relpersistence = node.relation?.RangeVar?.relpersistence || (node.relation as any)?.relpersistence;
+    const relpersistence = (node.relation as any)?.relpersistence;
     if (relpersistence === 't') {
       output.push('TEMPORARY');
     } else if (relpersistence === 'u') {
