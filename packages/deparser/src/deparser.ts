@@ -2916,4 +2916,116 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  ClusterStmt(node: t.ClusterStmt['ClusterStmt'], context: DeparserContext): string {
+    const output: string[] = ['CLUSTER'];
+    
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+      
+      if (node.indexname) {
+        output.push('USING', QuoteUtils.quote(node.indexname));
+      }
+    }
+    
+    if (node.params && node.params.length > 0) {
+      output.push('(');
+      const params = ListUtils.unwrapList(node.params).map(param => this.visit(param, context));
+      output.push(params.join(', '));
+      output.push(')');
+    }
+    
+    return output.join(' ');
+  }
+
+  VacuumStmt(node: t.VacuumStmt['VacuumStmt'], context: DeparserContext): string {
+    const output: string[] = ['VACUUM'];
+    
+    if (node.options && node.options.length > 0) {
+      output.push('(');
+      const options = ListUtils.unwrapList(node.options).map(option => this.visit(option, context));
+      output.push(options.join(', '));
+      output.push(')');
+    }
+    
+    if (node.rels && node.rels.length > 0) {
+      const relations = ListUtils.unwrapList(node.rels).map(rel => {
+        if (rel.VacuumRelation) {
+          const vacRel = rel.VacuumRelation;
+          let relOutput = this.visit(vacRel.relation, context);
+          
+          if (vacRel.va_cols && vacRel.va_cols.length > 0) {
+            const cols = ListUtils.unwrapList(vacRel.va_cols).map(col => this.visit(col, context));
+            relOutput += ` (${cols.join(', ')})`;
+          }
+          
+          return relOutput;
+        }
+        return this.visit(rel, context);
+      });
+      output.push(relations.join(', '));
+    }
+    
+    return output.join(' ');
+  }
+
+  ExplainStmt(node: t.ExplainStmt['ExplainStmt'], context: DeparserContext): string {
+    const output: string[] = ['EXPLAIN'];
+    
+    if (node.options && node.options.length > 0) {
+      output.push('(');
+      const options = ListUtils.unwrapList(node.options).map(option => this.visit(option, context));
+      output.push(options.join(', '));
+      output.push(')');
+    }
+    
+    if (node.query) {
+      output.push(this.visit(node.query, context));
+    }
+    
+    return output.join(' ');
+  }
+
+  ReindexStmt(node: t.ReindexStmt['ReindexStmt'], context: DeparserContext): string {
+    const output: string[] = ['REINDEX'];
+    
+    if (node.kind) {
+      switch (node.kind) {
+        case 'REINDEX_OBJECT_INDEX':
+          output.push('INDEX');
+          break;
+        case 'REINDEX_OBJECT_TABLE':
+          output.push('TABLE');
+          break;
+        case 'REINDEX_OBJECT_SCHEMA':
+          output.push('SCHEMA');
+          break;
+        case 'REINDEX_OBJECT_SYSTEM':
+          output.push('SYSTEM');
+          break;
+        case 'REINDEX_OBJECT_DATABASE':
+          output.push('DATABASE');
+          break;
+        default:
+          throw new Error(`Unsupported ReindexStmt kind: ${node.kind}`);
+      }
+    }
+    
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    }
+    
+    if (node.name) {
+      output.push(QuoteUtils.quote(node.name));
+    }
+    
+    if (node.params && node.params.length > 0) {
+      output.push('(');
+      const params = ListUtils.unwrapList(node.params).map(param => this.visit(param, context));
+      output.push(params.join(', '));
+      output.push(')');
+    }
+    
+    return output.join(' ');
+  }
 }
