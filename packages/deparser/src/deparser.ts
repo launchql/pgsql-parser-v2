@@ -2436,4 +2436,224 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  SetOperationStmt(node: t.SetOperationStmt['SetOperationStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.larg) {
+      output.push(this.visit(node.larg, context));
+    }
+    
+    if (node.op) {
+      switch (node.op) {
+        case 'SETOP_UNION':
+          output.push(node.all ? 'UNION ALL' : 'UNION');
+          break;
+        case 'SETOP_INTERSECT':
+          output.push(node.all ? 'INTERSECT ALL' : 'INTERSECT');
+          break;
+        case 'SETOP_EXCEPT':
+          output.push(node.all ? 'EXCEPT ALL' : 'EXCEPT');
+          break;
+        default:
+          throw new Error(`Unsupported SetOperation: ${node.op}`);
+      }
+    }
+    
+    if (node.rarg) {
+      output.push(this.visit(node.rarg, context));
+    }
+    
+    return output.join(' ');
+  }
+
+  ReplicaIdentityStmt(node: t.ReplicaIdentityStmt['ReplicaIdentityStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'TABLE'];
+    
+    if (node.identity_type) {
+      switch (node.identity_type) {
+        case 'REPLICA_IDENTITY_DEFAULT':
+          output.push('REPLICA', 'IDENTITY', 'DEFAULT');
+          break;
+        case 'REPLICA_IDENTITY_FULL':
+          output.push('REPLICA', 'IDENTITY', 'FULL');
+          break;
+        case 'REPLICA_IDENTITY_NOTHING':
+          output.push('REPLICA', 'IDENTITY', 'NOTHING');
+          break;
+        case 'REPLICA_IDENTITY_INDEX':
+          output.push('REPLICA', 'IDENTITY', 'USING', 'INDEX');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          break;
+        default:
+          throw new Error(`Unsupported replica identity type: ${node.identity_type}`);
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  AlterCollationStmt(node: t.AlterCollationStmt['AlterCollationStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'COLLATION'];
+    
+    if (node.collname && node.collname.length > 0) {
+      const collationName = ListUtils.unwrapList(node.collname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(collationName);
+    }
+    
+    output.push('REFRESH', 'VERSION');
+    
+    return output.join(' ');
+  }
+
+  AlterDomainStmt(node: t.AlterDomainStmt['AlterDomainStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'DOMAIN'];
+    
+    if (node.typeName && node.typeName.length > 0) {
+      const domainName = ListUtils.unwrapList(node.typeName)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(domainName);
+    }
+    
+    if (node.subtype) {
+      switch (node.subtype) {
+        case 'AT_SetNotNull':
+          output.push('SET', 'NOT', 'NULL');
+          break;
+        case 'AT_DropNotNull':
+          output.push('DROP', 'NOT', 'NULL');
+          break;
+        case 'AT_SetDefault':
+          output.push('SET', 'DEFAULT');
+          if (node.def) {
+            output.push(this.visit(node.def, context));
+          }
+          break;
+        case 'AT_DropDefault':
+          output.push('DROP', 'DEFAULT');
+          break;
+        case 'AT_AddConstraint':
+          output.push('ADD');
+          if (node.def) {
+            output.push(this.visit(node.def, context));
+          }
+          break;
+        case 'AT_DropConstraint':
+          output.push('DROP', 'CONSTRAINT');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          if (node.behavior === 'DROP_CASCADE') {
+            output.push('CASCADE');
+          } else if (node.behavior === 'DROP_RESTRICT') {
+            output.push('RESTRICT');
+          }
+          break;
+        case 'AT_ValidateConstraint':
+          output.push('VALIDATE', 'CONSTRAINT');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          break;
+        default:
+          throw new Error(`Unsupported AlterDomainStmt subtype: ${node.subtype}`);
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  PrepareStmt(node: t.PrepareStmt['PrepareStmt'], context: DeparserContext): string {
+    const output: string[] = ['PREPARE'];
+    
+    if (node.name) {
+      output.push(node.name);
+    }
+    
+    if (node.argtypes && node.argtypes.length > 0) {
+      const argTypes = ListUtils.unwrapList(node.argtypes)
+        .map(argType => this.visit(argType, context))
+        .join(', ');
+      output.push(`(${argTypes})`);
+    }
+    
+    output.push('AS');
+    
+    if (node.query) {
+      output.push(this.visit(node.query, context));
+    }
+    
+    return output.join(' ');
+  }
+
+  ExecuteStmt(node: t.ExecuteStmt['ExecuteStmt'], context: DeparserContext): string {
+    const output: string[] = ['EXECUTE'];
+    
+    if (node.name) {
+      output.push(node.name);
+    }
+    
+    if (node.params && node.params.length > 0) {
+      const params = ListUtils.unwrapList(node.params)
+        .map(param => this.visit(param, context))
+        .join(', ');
+      output.push(`(${params})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  DeallocateStmt(node: t.DeallocateStmt['DeallocateStmt'], context: DeparserContext): string {
+    const output: string[] = ['DEALLOCATE'];
+    
+    if (node.isall) {
+      output.push('ALL');
+    } else if (node.name) {
+      output.push(node.name);
+    }
+    
+    return output.join(' ');
+  }
+
+  NotifyStmt(node: t.NotifyStmt['NotifyStmt'], context: DeparserContext): string {
+    const output: string[] = ['NOTIFY'];
+    
+    if (node.conditionname) {
+      output.push(node.conditionname);
+    }
+    
+    if (node.payload !== null && node.payload !== undefined) {
+      output.push(',');
+      output.push(`'${node.payload}'`);
+    }
+    
+    return output.join(' ');
+  }
+
+  ListenStmt(node: t.ListenStmt['ListenStmt'], context: DeparserContext): string {
+    const output: string[] = ['LISTEN'];
+    
+    if (node.conditionname) {
+      output.push(node.conditionname);
+    }
+    
+    return output.join(' ');
+  }
+
+  UnlistenStmt(node: t.UnlistenStmt['UnlistenStmt'], context: DeparserContext): string {
+    const output: string[] = ['UNLISTEN'];
+    
+    if (node.conditionname) {
+      output.push(node.conditionname);
+    } else {
+      output.push('*');
+    }
+    
+    return output.join(' ');
+  }
 }
