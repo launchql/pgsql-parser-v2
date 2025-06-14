@@ -798,7 +798,7 @@ export class Deparser implements DeparserVisitor {
     return this.formatter.format([
       this.visit(node.arg, context),
       '::',
-      this.visit(node.typeName, context)
+      this.TypeName(node.typeName as t.TypeName['TypeName'], context)
     ]);
   }
 
@@ -866,8 +866,8 @@ export class Deparser implements DeparserVisitor {
     return output.join(' ');
   }
 
-  String(node: t.String['String'], context: DeparserContext): string { 
-    return node.sval || ''; 
+  String(node: t.String['String'], context: DeparserContext): string {
+    return node.sval ?? (node as any).str ?? '';
   }
   
   Integer(node: t.Integer['Integer'], context: DeparserContext): string { 
@@ -927,7 +927,8 @@ export class Deparser implements DeparserVisitor {
     }
 
     if (node.typeName) {
-      output.push(this.visit(node.typeName, context));
+      // typeName is not wrapped in a node container
+      output.push(this.TypeName(node.typeName as t.TypeName['TypeName'], context));
     }
 
     if (node.constraints) {
