@@ -1367,6 +1367,164 @@ export class Deparser implements DeparserVisitor {
     return '';
   }
 
+  NamedArgExpr(node: t.NamedArgExpr['NamedArgExpr'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.name) {
+      output.push(node.name);
+      output.push('=>');
+    }
+    
+    if (node.arg) {
+      output.push(this.visit(node.arg, context));
+    }
+    
+    return output.join(' ');
+  }
+
+  ViewStmt(node: t.ViewStmt['ViewStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    output.push('CREATE');
+    
+    if (node.replace) {
+      output.push('OR REPLACE');
+    }
+    
+    output.push('VIEW');
+    
+    if (node.view) {
+      output.push(this.visit(node.view, context));
+    }
+    
+    if (node.aliases && node.aliases.length > 0) {
+      const aliasStrs = ListUtils.unwrapList(node.aliases).map(alias => this.visit(alias, context));
+      output.push(this.formatter.parens(aliasStrs.join(', ')));
+    }
+    
+    output.push('AS');
+    
+    if (node.query) {
+      output.push(this.visit(node.query, context));
+    }
+    
+    if (node.withCheckOption) {
+      switch (node.withCheckOption) {
+        case 'CASCADED_CHECK_OPTION':
+          output.push('WITH CASCADED CHECK OPTION');
+          break;
+        case 'LOCAL_CHECK_OPTION':
+          output.push('WITH LOCAL CHECK OPTION');
+          break;
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  IndexStmt(node: t.IndexStmt['IndexStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    output.push('CREATE');
+    
+    if (node.unique) {
+      output.push('UNIQUE');
+    }
+    
+    output.push('INDEX');
+    
+    if (node.concurrent) {
+      output.push('CONCURRENTLY');
+    }
+    
+    if (node.if_not_exists) {
+      output.push('IF NOT EXISTS');
+    }
+    
+    if (node.idxname) {
+      output.push(QuoteUtils.quote(node.idxname));
+    }
+    
+    output.push('ON');
+    
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    }
+    
+    if (node.accessMethod && node.accessMethod !== 'btree') {
+      output.push('USING');
+      output.push(node.accessMethod);
+    }
+    
+    if (node.indexParams && node.indexParams.length > 0) {
+      const paramStrs = ListUtils.unwrapList(node.indexParams).map(param => this.visit(param, context));
+      output.push(this.formatter.parens(paramStrs.join(', ')));
+    }
+    
+    if (node.indexIncludingParams && node.indexIncludingParams.length > 0) {
+      const includeStrs = ListUtils.unwrapList(node.indexIncludingParams).map(param => this.visit(param, context));
+      output.push('INCLUDE');
+      output.push(this.formatter.parens(includeStrs.join(', ')));
+    }
+    
+    if (node.whereClause) {
+      output.push('WHERE');
+      output.push(this.visit(node.whereClause, context));
+    }
+    
+    if (node.tableSpace) {
+      output.push('TABLESPACE');
+      output.push(QuoteUtils.quote(node.tableSpace));
+    }
+    
+    return output.join(' ');
+  }
+
+  IndexElem(node: t.IndexElem['IndexElem'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.name) {
+      output.push(node.name);
+    } else if (node.expr) {
+      output.push(this.formatter.parens(this.visit(node.expr, context)));
+    }
+    
+    if (node.collation && node.collation.length > 0) {
+      const collationStrs = ListUtils.unwrapList(node.collation).map(coll => this.visit(coll, context));
+      output.push('COLLATE');
+      output.push(collationStrs.join('.'));
+    }
+    
+    if (node.opclass && node.opclass.length > 0) {
+      const opclassStrs = ListUtils.unwrapList(node.opclass).map(op => this.visit(op, context));
+      output.push(opclassStrs.join('.'));
+    }
+    
+    if (node.ordering) {
+      switch (node.ordering) {
+        case 'SORTBY_ASC':
+          output.push('ASC');
+          break;
+        case 'SORTBY_DESC':
+          output.push('DESC');
+          break;
+      }
+    }
+    
+    if (node.nulls_ordering) {
+      switch (node.nulls_ordering) {
+        case 'SORTBY_NULLS_FIRST':
+          output.push('NULLS FIRST');
+          break;
+        case 'SORTBY_NULLS_LAST':
+          output.push('NULLS LAST');
+          break;
+      }
+    }
+    
+    return output.join(' ');
+  }
+
   private getAggFunctionName(aggfnoid?: number): string {
     const commonAggFunctions: { [key: number]: string } = {
       2100: 'avg',
