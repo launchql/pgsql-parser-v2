@@ -63,7 +63,7 @@ describe('maintenance and utility statements', () => {
                 limitOption: 'LIMIT_OPTION_DEFAULT',
                 op: 'SETOP_NONE'
               }
-            ]
+              }
           }
         }
       }
