@@ -50,7 +50,9 @@ export class Deparser implements DeparserVisitor {
     const nodeType = this.getNodeType(node);
     const nodeData = this.getNodeData(node);
 
-
+    if (nodeType === 'TypeName' || (nodeData.names && nodeData.typemod !== undefined)) {
+      return this.TypeName(nodeData as any, context);
+    }
 
     // Check if this node has TypeName properties that should be unwrapped
     const typeNameProps = (typeNameProperties as any)[nodeType];
@@ -579,6 +581,21 @@ export class Deparser implements DeparserVisitor {
   }
 
   A_Const(node: t.A_Const['A_Const'], context: DeparserContext): string {
+    const nodeAny = node as any;
+    if (nodeAny.val) {
+      if (nodeAny.val.Integer?.ival !== undefined) {
+        return nodeAny.val.Integer.ival.toString();
+      } else if (nodeAny.val.Float?.fval !== undefined) {
+        return nodeAny.val.Float.fval;
+      } else if (nodeAny.val.String?.sval !== undefined) {
+        return QuoteUtils.escape(nodeAny.val.String.sval);
+      } else if (nodeAny.val.Boolean?.boolval !== undefined) {
+        return nodeAny.val.Boolean.boolval ? 'true' : 'false';
+      } else if (nodeAny.val.BitString?.bsval !== undefined) {
+        return nodeAny.val.BitString.bsval;
+      }
+    }
+    
     if (node.ival?.Integer?.ival !== undefined) {
       return node.ival.Integer.ival.toString();
     } else if (typeof node.ival === 'object' && 'ival' in node.ival) {
@@ -650,7 +667,13 @@ export class Deparser implements DeparserVisitor {
         return mods('"char"', args);
       }
       
-      return mods(typeName, args);
+      let result = mods(typeName, args);
+      
+      if (node.arrayBounds && node.arrayBounds.length > 0) {
+        result += '[]';
+      }
+      
+      return result;
     }
 
     if (names.length === 2) {
@@ -662,12 +685,24 @@ export class Deparser implements DeparserVisitor {
       
       if (catalog === 'pg_catalog') {
         const pgTypeName = this.getPgCatalogTypeName(type, args);
-        return mods(pgTypeName, args);
+        let result = mods(pgTypeName, args);
+        
+        if (node.arrayBounds && node.arrayBounds.length > 0) {
+          result += '[]';
+        }
+        
+        return result;
       }
     }
 
     const quotedNames = names.map((name: string) => QuoteUtils.quote(name));
-    return mods(quotedNames.join('.'), args);
+    let result = mods(quotedNames.join('.'), args);
+    
+    if (node.arrayBounds && node.arrayBounds.length > 0) {
+      result += '[]';
+    }
+    
+    return result;
   }
 
   Alias(node: t.Alias['Alias'], context: DeparserContext): string {
@@ -2057,6 +2092,113 @@ export class Deparser implements DeparserVisitor {
       }
     }
 
+    return output.join(' ');
+  }
+
+  CreateFunctionStmt(node: t.CreateFunctionStmt['CreateFunctionStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+    
+    if (node.replace) {
+      output.push('OR REPLACE');
+    }
+    
+    if (node.is_procedure) {
+      output.push('PROCEDURE');
+    } else {
+      output.push('FUNCTION');
+    }
+    
+    if (node.funcname && node.funcname.length > 0) {
+      const funcName = node.funcname.map(name => this.visit(name, context)).join('.');
+      output.push(funcName);
+    }
+    
+    output.push('(');
+    
+    if (node.parameters && node.parameters.length > 0) {
+      const params = node.parameters
+        .filter(param => {
+          const paramData = this.getNodeData(param);
+          return paramData.mode !== 'FUNC_PARAM_TABLE';
+        })
+        .map(param => this.visit(param, context));
+      output.push(params.join(' , '));
+    }
+    
+    output.push(')');
+    
+    const hasTableParams = node.parameters && node.parameters.some(param => {
+      const paramData = this.getNodeData(param);
+      return paramData.mode === 'FUNC_PARAM_TABLE';
+    });
+    
+    if (hasTableParams) {
+      output.push('RETURNS TABLE (');
+      const tableParams = node.parameters
+        .filter(param => {
+          const paramData = this.getNodeData(param);
+          return paramData.mode === 'FUNC_PARAM_TABLE';
+        })
+        .map(param => this.visit(param, context));
+      output.push(tableParams.join(', '));
+      output.push(')');
+    } else if (node.returnType) {
+      output.push('RETURNS');
+      output.push(this.TypeName(node.returnType as any, context));
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const options = node.options.map(opt => this.visit(opt, context));
+      output.push(...options);
+    }
+    
+    if (node.sql_body) {
+      const bodyType = this.getNodeType(node.sql_body);
+      if (bodyType === 'ReturnStmt') {
+        output.push(this.visit(node.sql_body, context));
+      } else {
+        output.push('BEGIN ATOMIC');
+        output.push(this.visit(node.sql_body, context));
+        output.push('END');
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  FunctionParameter(node: t.FunctionParameter['FunctionParameter'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.mode) {
+      switch (node.mode) {
+        case 'FUNC_PARAM_IN':
+          output.push('IN');
+          break;
+        case 'FUNC_PARAM_OUT':
+          output.push('OUT');
+          break;
+        case 'FUNC_PARAM_INOUT':
+          output.push('INOUT');
+          break;
+        case 'FUNC_PARAM_VARIADIC':
+          output.push('VARIADIC');
+          break;
+      }
+    }
+    
+    if (node.name) {
+      output.push(QuoteUtils.quote(node.name));
+    }
+    
+    if (node.argType) {
+      output.push(this.TypeName(node.argType as any, context));
+    }
+    
+    if (node.defexpr) {
+      output.push('DEFAULT');
+      output.push(this.visit(node.defexpr, context));
+    }
+    
     return output.join(' ');
   }
 }
