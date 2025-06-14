@@ -1257,4 +1257,136 @@ export class Deparser implements DeparserVisitor {
 
     return parts.join(' ');
   }
+
+  IndexElem(node: t.IndexElem['IndexElem'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    if (node.name) {
+      parts.push(QuoteUtils.quote(node.name));
+    } else if (node.expr) {
+      parts.push(this.visit(node.expr, context));
+    }
+
+    if (node.collation) {
+      const coll = ListUtils.unwrapList(node.collation)
+        .map(c => this.visit(c, context))
+        .join('.');
+      if (coll) {
+        parts.push(`COLLATE ${coll}`);
+      }
+    }
+
+    if (node.opclass) {
+      const opclass = ListUtils.unwrapList(node.opclass)
+        .map(o => this.visit(o, context))
+        .join('.');
+      if (opclass) {
+        parts.push(opclass);
+      }
+    }
+
+    switch (node.ordering) {
+      case 'SORTBY_ASC':
+        parts.push('ASC');
+        break;
+      case 'SORTBY_DESC':
+        parts.push('DESC');
+        break;
+    }
+
+    switch (node.nulls_ordering) {
+      case 'SORTBY_NULLS_FIRST':
+        parts.push('NULLS FIRST');
+        break;
+      case 'SORTBY_NULLS_LAST':
+        parts.push('NULLS LAST');
+        break;
+    }
+
+    return parts.join(' ');
+  }
+
+  IndexStmt(node: t.IndexStmt['IndexStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE'];
+
+    if (node.unique) {
+      parts.push('UNIQUE');
+    }
+
+    parts.push('INDEX');
+
+    if (node.concurrent) {
+      parts.push('CONCURRENTLY');
+    }
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.idxname) {
+      parts.push(QuoteUtils.quote(node.idxname));
+    }
+
+    parts.push('ON');
+    parts.push(this.visit(node.relation, context));
+
+    if (node.accessMethod && node.accessMethod.toLowerCase() !== 'btree') {
+      parts.push('USING');
+      parts.push(node.accessMethod.toUpperCase());
+    }
+
+    const params = ListUtils.unwrapList(node.indexParams);
+    if (params.length) {
+      const elems = params.map(p => this.visit(p, context));
+      parts.push(this.formatter.parens(elems.join(', ')));
+    }
+
+    const include = ListUtils.unwrapList(node.indexIncludingParams);
+    if (include.length) {
+      const elems = include.map(p => this.visit(p, context));
+      parts.push(`INCLUDE ${this.formatter.parens(elems.join(', '))}`);
+    }
+
+    if (node.nulls_not_distinct) {
+      parts.push('NULLS NOT DISTINCT');
+    }
+
+    if (node.options) {
+      const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+      if (opts.length) {
+        parts.push(`WITH (${opts.join(', ')})`);
+      }
+    }
+
+    if (node.tableSpace) {
+      parts.push('TABLESPACE');
+      parts.push(QuoteUtils.quote(node.tableSpace));
+    }
+
+    if (node.whereClause) {
+      parts.push('WHERE');
+      parts.push(this.visit(node.whereClause, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  CreateSchemaStmt(node: t.CreateSchemaStmt['CreateSchemaStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE SCHEMA'];
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.schemaname) {
+      parts.push(QuoteUtils.quote(node.schemaname));
+    }
+
+    if (node.authrole) {
+      parts.push('AUTHORIZATION');
+      parts.push(this.visit(node.authrole, context));
+    }
+
+    return parts.join(' ');
+  }
 }
