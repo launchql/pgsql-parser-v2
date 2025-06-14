@@ -96,12 +96,24 @@ export class Deparser implements DeparserVisitor {
     if (this.isRangeVar(node)) {
       return 'RangeVar';
     }
+
+    if (
+      node &&
+      typeof node === 'object' &&
+      'stmt' in (node as any)
+    ) {
+      return 'RawStmt';
+    }
+
     return Object.keys(node)[0];
   }
 
   getNodeData(node: Node): any {
     const type = this.getNodeType(node);
     if (type === 'RangeVar' && !(node as any).RangeVar) {
+      return node;
+    }
+    if (type === 'RawStmt' && !(node as any).RawStmt) {
       return node;
     }
     return (node as any)[type];
