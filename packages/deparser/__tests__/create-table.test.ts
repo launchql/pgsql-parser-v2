@@ -209,7 +209,13 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'text' } }],
                       typemod: -1
                     },
-                    is_not_null: true
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_NOTNULL'
+                        }
+                      }
+                    ]
                   }
                 }
               ],

@@ -116,6 +116,22 @@ export const cleanTree = (tree: any) => {
     ColumnDef: (obj: any) => {
       if (obj.is_local === true) delete obj.is_local;
       return cleanTree(obj);
+    },
+    InsertStmt: (obj: any) => {
+      if (obj.override === 'OVERRIDING_NOT_SET') delete obj.override;
+      return cleanTree(obj);
+    },
+    SelectStmt: (obj: any) => {
+      if (obj.limitOption === 'LIMIT_OPTION_DEFAULT') delete obj.limitOption;
+      if (obj.op === 'SETOP_NONE') delete obj.op;
+      return cleanTree(obj);
+    },
+    String: (obj: any) => {
+      if (obj.str !== undefined && obj.sval === undefined) {
+        obj.sval = obj.str;
+        delete obj.str;
+      }
+      return obj;
     }
   });
   return stripRangeDefaults(cleaned);
