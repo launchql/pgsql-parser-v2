@@ -935,6 +935,9 @@ export class Deparser implements DeparserVisitor {
   }
 
   String(node: t.String['String'], context: DeparserContext): string { 
+    if (context.isStringLiteral) {
+      return `'${node.sval || ''}'`;
+    }
     return node.sval || ''; 
   }
   
@@ -1120,7 +1123,7 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (windowParts.length > 0) {
-      output.push(this.formatter.parens(windowParts.join(' ')));
+      output.push(windowParts.join(' '));
     }
     
     return output.join(' ');
@@ -1217,6 +1220,212 @@ export class Deparser implements DeparserVisitor {
     const args = ListUtils.unwrapList(node.args);
     const argStrs = args.map(arg => this.visit(arg, context));
     return `ROW(${argStrs.join(', ')})`;
+  }
+
+  OpExpr(node: t.OpExpr['OpExpr'], context: DeparserContext): string {
+    const args = ListUtils.unwrapList(node.args);
+    if (args.length === 2) {
+      const left = this.visit(args[0], context);
+      const right = this.visit(args[1], context);
+      const opname = this.getOperatorName(node.opno);
+      return `${left} ${opname} ${right}`;
+    } else if (args.length === 1) {
+      const arg = this.visit(args[0], context);
+      const opname = this.getOperatorName(node.opno);
+      return `${opname} ${arg}`;
+    }
+    throw new Error(`Unsupported OpExpr with ${args.length} arguments`);
+  }
+
+  DistinctExpr(node: t.DistinctExpr['DistinctExpr'], context: DeparserContext): string {
+    const args = ListUtils.unwrapList(node.args);
+    if (args.length === 2) {
+      const literalContext = { ...context, isStringLiteral: true };
+      const left = this.visit(args[0], literalContext);
+      const right = this.visit(args[1], literalContext);
+      return `${left} IS DISTINCT FROM ${right}`;
+    }
+    throw new Error(`DistinctExpr requires exactly 2 arguments, got ${args.length}`);
+  }
+
+  NullIfExpr(node: t.NullIfExpr['NullIfExpr'], context: DeparserContext): string {
+    const args = ListUtils.unwrapList(node.args);
+    if (args.length === 2) {
+      const literalContext = { ...context, isStringLiteral: true };
+      const left = this.visit(args[0], literalContext);
+      const right = this.visit(args[1], literalContext);
+      return `NULLIF(${left}, ${right})`;
+    }
+    throw new Error(`NullIfExpr requires exactly 2 arguments, got ${args.length}`);
+  }
+
+  ScalarArrayOpExpr(node: t.ScalarArrayOpExpr['ScalarArrayOpExpr'], context: DeparserContext): string {
+    const args = ListUtils.unwrapList(node.args);
+    if (args.length === 2) {
+      const left = this.visit(args[0], context);
+      const right = this.visit(args[1], context);
+      const operator = node.useOr ? 'ANY' : 'ALL';
+      const opname = this.getOperatorName(node.opno);
+      return `${left} ${opname} ${operator}(${right})`;
+    }
+    throw new Error(`ScalarArrayOpExpr requires exactly 2 arguments, got ${args.length}`);
+  }
+
+  Aggref(node: t.Aggref['Aggref'], context: DeparserContext): string {
+    const funcName = this.getAggFunctionName(node.aggfnoid);
+    let result = funcName + '(';
+
+    if (node.aggdistinct && node.aggdistinct.length > 0) {
+      result += 'DISTINCT ';
+    }
+
+    if (node.args && node.args.length > 0) {
+      const args = ListUtils.unwrapList(node.args);
+      const argStrs = args.map(arg => this.visit(arg, context));
+      result += argStrs.join(', ');
+    } else if (funcName.toUpperCase() === 'COUNT') {
+      result += '*';
+    }
+
+    result += ')';
+
+    if (node.aggorder && node.aggorder.length > 0) {
+      result += ' ORDER BY ';
+      const orderItems = ListUtils.unwrapList(node.aggorder);
+      const orderStrs = orderItems.map(item => this.visit(item, context));
+      result += orderStrs.join(', ');
+    }
+
+    return result;
+  }
+
+  WindowFunc(node: t.WindowFunc['WindowFunc'], context: DeparserContext): string {
+    const funcName = this.getWindowFunctionName(node.winfnoid);
+    let result = funcName + '(';
+
+    if (node.args && node.args.length > 0) {
+      const args = ListUtils.unwrapList(node.args);
+      const argStrs = args.map(arg => this.visit(arg, context));
+      result += argStrs.join(', ');
+    }
+
+    result += ') OVER ';
+
+    if (node.winref) {
+      const windowDef = this.visit(node.winref, context);
+      result += `(${windowDef})`;
+    } else {
+      result += '()';
+    }
+
+    return result;
+  }
+
+
+
+  FieldSelect(node: t.FieldSelect['FieldSelect'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.arg) {
+      output.push(this.visit(node.arg, context));
+    }
+
+    if (node.fieldnum !== undefined) {
+      output.push(`.field_${node.fieldnum}`);
+    }
+
+    return output.join('');
+  }
+
+  RelabelType(node: t.RelabelType['RelabelType'], context: DeparserContext): string {
+    if (node.arg) {
+      const literalContext = { ...context, isStringLiteral: true };
+      return this.visit(node.arg, literalContext);
+    }
+    return '';
+  }
+
+  CoerceViaIO(node: t.CoerceViaIO['CoerceViaIO'], context: DeparserContext): string {
+    if (node.arg) {
+      return this.visit(node.arg, context);
+    }
+    return '';
+  }
+
+  ArrayCoerceExpr(node: t.ArrayCoerceExpr['ArrayCoerceExpr'], context: DeparserContext): string {
+    if (node.arg) {
+      return this.visit(node.arg, context);
+    }
+    return '';
+  }
+
+  ConvertRowtypeExpr(node: t.ConvertRowtypeExpr['ConvertRowtypeExpr'], context: DeparserContext): string {
+    if (node.arg) {
+      const literalContext = { ...context, isStringLiteral: true };
+      return this.visit(node.arg, literalContext);
+    }
+    return '';
+  }
+
+  private getAggFunctionName(aggfnoid?: number): string {
+    const commonAggFunctions: { [key: number]: string } = {
+      2100: 'avg',
+      2101: 'count',
+      2102: 'max',
+      2103: 'min',
+      2104: 'sum',
+      2105: 'stddev',
+      2106: 'variance',
+      2107: 'array_agg',
+      2108: 'string_agg'
+    };
+    
+    return commonAggFunctions[aggfnoid || 0] || 'unknown_agg';
+  }
+
+  private getWindowFunctionName(winfnoid?: number): string {
+    const commonWindowFunctions: { [key: number]: string } = {
+      3100: 'row_number',
+      3101: 'rank',
+      3102: 'dense_rank',
+      3103: 'percent_rank',
+      3104: 'cume_dist',
+      3105: 'ntile',
+      3106: 'lag',
+      3107: 'lead',
+      3108: 'first_value',
+      3109: 'last_value'
+    };
+    
+    return commonWindowFunctions[winfnoid || 0] || 'unknown_window_func';
+  }
+
+  private getOperatorName(opno?: number): string {
+    const commonOperators: { [key: number]: string } = {
+      96: '=',
+      518: '<>',
+      97: '<',
+      521: '>',
+      523: '<=',
+      525: '>=',
+      551: '+',
+      552: '-',
+      553: '*',
+      554: '/',
+      555: '%',
+      484: '-', // unary minus
+      1752: '~~', // LIKE
+      1753: '!~~', // NOT LIKE
+      1754: '~~*', // ILIKE
+      1755: '!~~*', // NOT ILIKE
+      15: '=', // int4eq
+      58: '<', // int4lt
+      59: '<=', // int4le
+      61: '>', // int4gt
+      62: '>=', // int4ge
+    };
+    
+    return commonOperators[opno || 0] || '=';
   }
 
   JoinExpr(node: t.JoinExpr['JoinExpr'], context: DeparserContext): string {
