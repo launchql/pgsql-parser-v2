@@ -1640,6 +1640,79 @@ export class Deparser implements DeparserVisitor {
     return parts.join(' ');
   }
 
+  CreatePolicyStmt(node: t.CreatePolicyStmt['CreatePolicyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE POLICY'];
+
+    if (node.policy_name) {
+      parts.push(QuoteUtils.quote(node.policy_name));
+    }
+
+    if (node.table) {
+      parts.push('ON');
+      parts.push(this.visit(node.table, context));
+    }
+
+    if (node.permissive === false) {
+      parts.push('AS RESTRICTIVE');
+    }
+
+    if (node.cmd_name && node.cmd_name !== 'all') {
+      parts.push('FOR');
+      parts.push(node.cmd_name.toUpperCase());
+    }
+
+    parts.push('TO');
+    const roles = ListUtils.unwrapList(node.roles).map(r => this.visit(r, context));
+    if (roles.length) {
+      parts.push(roles.join(', '));
+    } else {
+      parts.push('PUBLIC');
+    }
+
+    if (node.qual) {
+      parts.push('USING');
+      parts.push(this.formatter.parens(this.visit(node.qual, context)));
+    }
+
+    if (node.with_check) {
+      parts.push('WITH CHECK');
+      parts.push(this.formatter.parens(this.visit(node.with_check, context)));
+    }
+
+    return parts.join(' ');
+  }
+
+  AlterPolicyStmt(node: t.AlterPolicyStmt['AlterPolicyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['ALTER POLICY'];
+
+    if (node.policy_name) {
+      parts.push(QuoteUtils.quote(node.policy_name));
+    }
+
+    if (node.table) {
+      parts.push('ON');
+      parts.push(this.visit(node.table, context));
+    }
+
+    const roles = ListUtils.unwrapList(node.roles).map(r => this.visit(r, context));
+    if (roles.length) {
+      parts.push('TO');
+      parts.push(roles.join(', '));
+    }
+
+    if (node.qual) {
+      parts.push('USING');
+      parts.push(this.formatter.parens(this.visit(node.qual, context)));
+    }
+
+    if (node.with_check) {
+      parts.push('WITH CHECK');
+      parts.push(this.formatter.parens(this.visit(node.with_check, context)));
+    }
+
+    return parts.join(' ');
+  }
+
   DefElem(node: t.DefElem['DefElem'], context: DeparserContext): string {
     let name = node.defname?.toUpperCase() || '';
     if (node.defnamespace) {

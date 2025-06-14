@@ -3,5 +3,7 @@
   "IndexStmt": ["relation"],
   "VacuumRelation": ["relation"],
   "TruncateStmt": ["relations"],
-  "GrantStmt": ["objects"]
+  "GrantStmt": ["objects"],
+  "CreatePolicyStmt": ["table"],
+  "AlterPolicyStmt": ["table"]
 }
