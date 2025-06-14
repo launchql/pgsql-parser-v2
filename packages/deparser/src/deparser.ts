@@ -591,6 +591,8 @@ export class Deparser implements DeparserVisitor {
       return QuoteUtils.escape(node.sval.sval as string);
     } else if (node.boolval?.Boolean?.boolval !== undefined) {
       return node.boolval.Boolean.boolval ? 'true' : 'false';
+    } else if (typeof node.boolval === 'object' && 'boolval' in node.boolval) {
+      return node.boolval.boolval ? 'true' : 'false';
     } else if (node.bsval?.BitString?.bsval !== undefined) {
       return node.bsval.BitString.bsval;
     } else if (node.isnull) {
@@ -627,7 +629,12 @@ export class Deparser implements DeparserVisitor {
       return '';
     }
 
-    const args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
+    let args: string | null = null;
+    if (node.typmods) {
+      args = this.formatTypeMods(node.typmods, context);
+    } else if (node.typemod && node.typemod !== -1) {
+      args = this.formatSingleTypeMod(node.typemod, names[0]);
+    }
 
     const mods = (name: string, size: string | null) => {
       if (size != null) {
@@ -684,12 +691,13 @@ export class Deparser implements DeparserVisitor {
   RangeVar(node: t.RangeVar['RangeVar'], context: DeparserContext): string {
     const output: string[] = [];
 
+    let tableName = '';
     if (node.schemaname) {
-      output.push(QuoteUtils.quote(node.schemaname));
-      output.push('.');
+      tableName = QuoteUtils.quote(node.schemaname) + '.' + QuoteUtils.quote(node.relname);
+    } else {
+      tableName = QuoteUtils.quote(node.relname);
     }
-
-    output.push(QuoteUtils.quote(node.relname));
+    output.push(tableName);
 
     if (node.alias) {
       const aliasStr = this.deparse(node.alias, context);
@@ -708,6 +716,43 @@ export class Deparser implements DeparserVisitor {
     return mods.map(mod => {
       return this.deparse(mod, context);
     }).join(', ');
+  }
+
+  formatSingleTypeMod(typemod: number, typeName: string): string | null {
+    
+    switch (typeName) {
+      case 'varchar':
+      case 'bpchar':
+      case 'char':
+        if (typemod > 4) {
+          return (typemod - 64).toString();
+        }
+        break;
+      case 'numeric':
+      case 'decimal':
+        if (typemod > 4) {
+          const modValue = typemod - 4;
+          const precision = (modValue >> 16) & 0xFFFF;
+          const scale = modValue & 0xFFFF;
+          if (scale > 0) {
+            return `${precision},${scale}`;
+          } else {
+            return precision.toString();
+          }
+        }
+        break;
+      case 'time':
+      case 'timetz':
+      case 'timestamp':
+      case 'timestamptz':
+      case 'interval':
+        if (typemod >= 0) {
+          return typemod.toString();
+        }
+        break;
+    }
+    
+    return null;
   }
 
   getPgCatalogTypeName(typeName: string, size: string | null): string {
@@ -903,6 +948,10 @@ export class Deparser implements DeparserVisitor {
   CreateStmt(node: t.CreateStmt['CreateStmt'], context: DeparserContext): string {
     const output: string[] = ['CREATE'];
 
+    if (node.relation && this.getNodeData(node.relation).relpersistence === 't') {
+      output.push('TEMPORARY');
+    }
+
     if (node.if_not_exists) {
       output.push('TABLE IF NOT EXISTS');
     } else {
@@ -984,9 +1033,21 @@ export class Deparser implements DeparserVisitor {
         break;
       case 'CONSTR_PRIMARY':
         output.push('PRIMARY KEY');
+        if (node.keys && node.keys.length > 0) {
+          const keyList = ListUtils.unwrapList(node.keys)
+            .map(key => this.visit(key, context))
+            .join(', ');
+          output.push(`(${keyList})`);
+        }
         break;
       case 'CONSTR_UNIQUE':
         output.push('UNIQUE');
+        if (node.keys && node.keys.length > 0) {
+          const keyList = ListUtils.unwrapList(node.keys)
+            .map(key => this.visit(key, context))
+            .join(', ');
+          output.push(`(${keyList})`);
+        }
         break;
       case 'CONSTR_FOREIGN':
         output.push('REFERENCES');
