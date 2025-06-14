@@ -609,7 +609,7 @@ export class Deparser implements DeparserVisitor {
     }).join('.');
   }
 
-  TypeName(node: t.TypeName['TypeName'], context: DeparserContext): string {
+  TypeName(node: t.TypeName, context: DeparserContext): string {
     if (!node.names) {
       return '';
     }
