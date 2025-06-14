@@ -3556,4 +3556,254 @@ export class Deparser implements DeparserVisitor {
 
     return output.join(' ');
   }
+
+  CreateTrigStmt(node: t.CreateTrigStmt['CreateTrigStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+
+    if (node.replace) {
+      output.push('OR REPLACE');
+    }
+
+    if (node.isconstraint) {
+      output.push('CONSTRAINT');
+    }
+
+    output.push('TRIGGER');
+
+    if (node.trigname) {
+      output.push(QuoteUtils.quote(node.trigname));
+    }
+
+    const timing: string[] = [];
+    if (node.timing & 2) timing.push('BEFORE');
+    if (node.timing & 4) timing.push('AFTER');
+    if (node.timing & 8) timing.push('INSTEAD OF');
+    output.push(timing.join(' '));
+
+    const events: string[] = [];
+    if (node.events & 16) events.push('INSERT');
+    if (node.events & 8) events.push('DELETE');
+    if (node.events & 4) events.push('UPDATE');
+    if (node.events & 32) events.push('TRUNCATE');
+    output.push(events.join(' OR '));
+
+    if (node.columns && node.columns.length > 0) {
+      output.push('OF');
+      const columnNames = ListUtils.unwrapList(node.columns)
+        .map(col => this.visit(col, context))
+        .join(', ');
+      output.push(columnNames);
+    }
+
+    output.push('ON');
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    }
+
+    if (node.constrrel) {
+      output.push('FROM');
+      output.push(this.visit(node.constrrel, context));
+    }
+
+    if (node.deferrable) {
+      output.push('DEFERRABLE');
+    }
+
+    if (node.initdeferred) {
+      output.push('INITIALLY DEFERRED');
+    }
+
+    if (node.row) {
+      output.push('FOR EACH ROW');
+    } else {
+      output.push('FOR EACH STATEMENT');
+    }
+
+    if (node.whenClause) {
+      output.push('WHEN');
+      output.push('(');
+      output.push(this.visit(node.whenClause, context));
+      output.push(')');
+    }
+
+    output.push('EXECUTE');
+    if (node.funcname && node.funcname.length > 0) {
+      const funcName = ListUtils.unwrapList(node.funcname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push('FUNCTION', funcName);
+    }
+
+    if (node.args && node.args.length > 0) {
+      output.push('(');
+      const args = ListUtils.unwrapList(node.args)
+        .map(arg => this.visit(arg, context))
+        .join(', ');
+      output.push(args);
+      output.push(')');
+    } else {
+      output.push('()');
+    }
+
+    return output.join(' ');
+  }
+
+  CreateEventTrigStmt(node: t.CreateEventTrigStmt['CreateEventTrigStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE EVENT TRIGGER'];
+
+    if (node.trigname) {
+      output.push(QuoteUtils.quote(node.trigname));
+    }
+
+    output.push('ON');
+
+    if (node.eventname) {
+      output.push(node.eventname);
+    }
+
+    if (node.whenclause && node.whenclause.length > 0) {
+      output.push('WHEN');
+      const conditions = ListUtils.unwrapList(node.whenclause)
+        .map(condition => this.visit(condition, context))
+        .join(' AND ');
+      output.push(conditions);
+    }
+
+    output.push('EXECUTE');
+
+    if (node.funcname && node.funcname.length > 0) {
+      const funcName = ListUtils.unwrapList(node.funcname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push('FUNCTION', funcName + '()');
+    }
+
+    return output.join(' ');
+  }
+
+  AlterEventTrigStmt(node: t.AlterEventTrigStmt['AlterEventTrigStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER EVENT TRIGGER'];
+
+    if (node.trigname) {
+      output.push(QuoteUtils.quote(node.trigname));
+    }
+
+    if (node.tgenabled) {
+      switch (node.tgenabled) {
+        case 'O':
+          output.push('ENABLE');
+          break;
+        case 'D':
+          output.push('DISABLE');
+          break;
+        case 'R':
+          output.push('ENABLE REPLICA');
+          break;
+        case 'A':
+          output.push('ENABLE ALWAYS');
+          break;
+        default:
+          throw new Error(`Unsupported trigger enable state: ${node.tgenabled}`);
+      }
+    }
+
+    return output.join(' ');
+  }
+
+  CreateOpClassStmt(node: t.CreateOpClassStmt['CreateOpClassStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE OPERATOR CLASS'];
+
+    if (node.opclassname && node.opclassname.length > 0) {
+      const className = ListUtils.unwrapList(node.opclassname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(className);
+    }
+
+    if (node.isDefault) {
+      output.push('DEFAULT');
+    }
+
+    output.push('FOR TYPE');
+
+    if (node.datatype) {
+      output.push(this.visit(node.datatype, context));
+    }
+
+    output.push('USING');
+
+    if (node.amname) {
+      output.push(node.amname);
+    }
+
+    if (node.opfamilyname && node.opfamilyname.length > 0) {
+      output.push('FAMILY');
+      const familyName = ListUtils.unwrapList(node.opfamilyname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(familyName);
+    }
+
+    output.push('AS');
+
+    if (node.items && node.items.length > 0) {
+      const items = ListUtils.unwrapList(node.items)
+        .map(item => this.visit(item, context))
+        .join(', ');
+      output.push(items);
+    }
+
+    return output.join(' ');
+  }
+
+  CreateOpFamilyStmt(node: t.CreateOpFamilyStmt['CreateOpFamilyStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE OPERATOR FAMILY'];
+
+    if (node.opfamilyname && node.opfamilyname.length > 0) {
+      const familyName = ListUtils.unwrapList(node.opfamilyname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(familyName);
+    }
+
+    output.push('USING');
+
+    if (node.amname) {
+      output.push(node.amname);
+    }
+
+    return output.join(' ');
+  }
+
+  AlterOpFamilyStmt(node: t.AlterOpFamilyStmt['AlterOpFamilyStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER OPERATOR FAMILY'];
+
+    if (node.opfamilyname && node.opfamilyname.length > 0) {
+      const familyName = ListUtils.unwrapList(node.opfamilyname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(familyName);
+    }
+
+    output.push('USING');
+
+    if (node.amname) {
+      output.push(node.amname);
+    }
+
+    if (node.isDrop) {
+      output.push('DROP');
+    } else {
+      output.push('ADD');
+    }
+
+    if (node.items && node.items.length > 0) {
+      const items = ListUtils.unwrapList(node.items)
+        .map(item => this.visit(item, context))
+        .join(', ');
+      output.push(items);
+    }
+
+    return output.join(' ');
+  }
 }
