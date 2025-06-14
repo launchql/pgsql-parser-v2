@@ -50,6 +50,8 @@ export class Deparser implements DeparserVisitor {
     const nodeType = this.getNodeType(node);
     const nodeData = this.getNodeData(node);
 
+
+
     // Check if this node has TypeName properties that should be unwrapped
     const typeNameProps = (typeNameProperties as any)[nodeType];
     if (typeNameProps) {
@@ -609,7 +611,7 @@ export class Deparser implements DeparserVisitor {
     }).join('.');
   }
 
-  TypeName(node: t.TypeName['TypeName'], context: DeparserContext): string {
+  TypeName(node: t.TypeName, context: DeparserContext): string {
     if (!node.names) {
       return '';
     }
@@ -621,8 +623,9 @@ export class Deparser implements DeparserVisitor {
       return '';
     }).filter(Boolean);
 
-    const catalog = names[0];
-    const type = names[1];
+    if (names.length === 0) {
+      return '';
+    }
 
     const args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
 
@@ -633,21 +636,31 @@ export class Deparser implements DeparserVisitor {
       return name;
     };
 
-    if (catalog === 'char' && !type) {
-      return mods('"char"', args);
-    }
-    
-    if (catalog === 'pg_catalog' && type === 'char') {
-      return mods('pg_catalog."char"', args);
-    }
-
-    if (catalog !== 'pg_catalog') {
-      const quotedNames = names.map((name: string) => QuoteUtils.quote(name));
-      return mods(quotedNames.join('.'), args);
+    if (names.length === 1) {
+      const typeName = names[0];
+      
+      if (typeName === 'char') {
+        return mods('"char"', args);
+      }
+      
+      return mods(typeName, args);
     }
 
-    const pgTypeName = this.getPgCatalogTypeName(type, args);
-    return mods(pgTypeName, args);
+    if (names.length === 2) {
+      const [catalog, type] = names;
+      
+      if (catalog === 'pg_catalog' && type === 'char') {
+        return mods('pg_catalog."char"', args);
+      }
+      
+      if (catalog === 'pg_catalog') {
+        const pgTypeName = this.getPgCatalogTypeName(type, args);
+        return mods(pgTypeName, args);
+      }
+    }
+
+    const quotedNames = names.map((name: string) => QuoteUtils.quote(name));
+    return mods(quotedNames.join('.'), args);
   }
 
   Alias(node: t.Alias['Alias'], context: DeparserContext): string {
@@ -924,7 +937,7 @@ export class Deparser implements DeparserVisitor {
     }
 
     if (node.typeName) {
-      output.push(this.visit(node.typeName, context));
+      output.push(this.TypeName(node.typeName, context));
     }
 
     if (node.constraints) {
@@ -1179,5 +1192,83 @@ export class Deparser implements DeparserVisitor {
     }
     
     return result;
+  }
+
+  TransactionStmt(node: t.TransactionStmt['TransactionStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    switch (node.kind) {
+      case 'TRANS_STMT_BEGIN':
+        return 'BEGIN';
+      case 'TRANS_STMT_START':
+        return 'START TRANSACTION';
+      case 'TRANS_STMT_COMMIT':
+        return 'COMMIT';
+      case 'TRANS_STMT_ROLLBACK':
+        return 'ROLLBACK';
+      case 'TRANS_STMT_SAVEPOINT':
+        output.push('SAVEPOINT');
+        if (node.savepoint_name) {
+          output.push(QuoteUtils.quote(node.savepoint_name));
+        }
+        break;
+      case 'TRANS_STMT_RELEASE':
+        output.push('RELEASE SAVEPOINT');
+        if (node.savepoint_name) {
+          output.push(QuoteUtils.quote(node.savepoint_name));
+        }
+        break;
+      case 'TRANS_STMT_ROLLBACK_TO':
+        output.push('ROLLBACK TO');
+        if (node.savepoint_name) {
+          output.push(QuoteUtils.quote(node.savepoint_name));
+        }
+        break;
+      case 'TRANS_STMT_PREPARE':
+        output.push('PREPARE TRANSACTION');
+        if (node.gid) {
+          output.push(`'${node.gid}'`);
+        }
+        break;
+      case 'TRANS_STMT_COMMIT_PREPARED':
+        output.push('COMMIT PREPARED');
+        if (node.gid) {
+          output.push(`'${node.gid}'`);
+        }
+        break;
+      case 'TRANS_STMT_ROLLBACK_PREPARED':
+        output.push('ROLLBACK PREPARED');
+        if (node.gid) {
+          output.push(`'${node.gid}'`);
+        }
+        break;
+      default:
+        throw new Error(`Unsupported TransactionStmt kind: ${node.kind}`);
+    }
+    
+    return output.join(' ');
+  }
+
+  VariableSetStmt(node: t.VariableSetStmt['VariableSetStmt'], context: DeparserContext): string {
+    switch (node.kind) {
+      case 'VAR_SET_VALUE':
+        const localPrefix = node.is_local ? 'LOCAL ' : '';
+        const args = node.args ? ListUtils.unwrapList(node.args).map(arg => this.visit(arg, context)).join(', ') : '';
+        return `SET ${localPrefix}${node.name} = ${args}`;
+      case 'VAR_SET_DEFAULT':
+        return `SET ${node.name} TO DEFAULT`;
+      case 'VAR_SET_CURRENT':
+        return `SET ${node.name} FROM CURRENT`;
+      case 'VAR_RESET':
+        return `RESET ${node.name}`;
+      case 'VAR_RESET_ALL':
+        return 'RESET ALL';
+      default:
+        throw new Error(`Unsupported VariableSetStmt kind: ${node.kind}`);
+    }
+  }
+
+  VariableShowStmt(node: t.VariableShowStmt['VariableShowStmt'], context: DeparserContext): string {
+    return `SHOW ${node.name}`;
   }
 }
