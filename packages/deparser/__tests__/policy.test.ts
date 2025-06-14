@@ -34,6 +34,7 @@ describe('policy statements', () => {
             policy_name: 'update_owner',
             table: { relname: 'users' },
             cmd_name: 'update',
+            permissive: false,
             roles: [
               { RoleSpec: { roletype: 'ROLESPEC_CSTRING', rolename: 'admin' } }
             ],
