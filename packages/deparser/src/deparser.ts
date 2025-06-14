@@ -1171,13 +1171,90 @@ export class Deparser implements DeparserVisitor {
   FromExpr(node: t.FromExpr['FromExpr'], context: DeparserContext): string {
     const fromlist = ListUtils.unwrapList(node.fromlist);
     const fromStrs = fromlist.map(item => this.visit(item, context));
-    
+
     let result = fromStrs.join(', ');
-    
+
     if (node.quals) {
       result += ` WHERE ${this.visit(node.quals, context)}`;
     }
-    
+
     return result;
+  }
+
+  TransactionStmt(node: t.TransactionStmt['TransactionStmt'], context: DeparserContext): string {
+    switch (node.kind) {
+      case 'TRANS_STMT_BEGIN':
+        return 'BEGIN';
+      case 'TRANS_STMT_START':
+        return 'START TRANSACTION';
+      case 'TRANS_STMT_COMMIT':
+        return node.chain ? 'COMMIT AND CHAIN' : 'COMMIT';
+      case 'TRANS_STMT_ROLLBACK':
+        return node.chain ? 'ROLLBACK AND CHAIN' : 'ROLLBACK';
+      case 'TRANS_STMT_SAVEPOINT':
+        return `SAVEPOINT ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_RELEASE':
+        return `RELEASE ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_ROLLBACK_TO':
+        return `ROLLBACK TO SAVEPOINT ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_PREPARE':
+        return `PREPARE TRANSACTION '${node.gid}'`;
+      case 'TRANS_STMT_COMMIT_PREPARED':
+        return `COMMIT PREPARED '${node.gid}'`;
+      case 'TRANS_STMT_ROLLBACK_PREPARED':
+        return `ROLLBACK PREPARED '${node.gid}'`;
+      default:
+        return '';
+    }
+  }
+
+  DropStmt(node: t.DropStmt['DropStmt'], context: DeparserContext): string {
+    const typeMap: Record<string, string> = {
+      OBJECT_TABLE: 'TABLE',
+      OBJECT_INDEX: 'INDEX',
+      OBJECT_SCHEMA: 'SCHEMA',
+      OBJECT_VIEW: 'VIEW',
+      OBJECT_MATVIEW: 'MATERIALIZED VIEW',
+      OBJECT_SEQUENCE: 'SEQUENCE'
+    };
+
+    const objects = ListUtils.unwrapList(node.objects).map(list => {
+      const names = ListUtils.unwrapList(list).map(n => this.visit(n, context));
+      return names.join('.');
+    });
+
+    const parts: string[] = ['DROP'];
+    parts.push(typeMap[node.removeType as string] || node.removeType!);
+
+    if (node.concurrent) {
+      parts.push('CONCURRENTLY');
+    }
+
+    if (node.missing_ok) {
+      parts.push('IF EXISTS');
+    }
+
+    parts.push(objects.join(', '));
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  TruncateStmt(node: t.TruncateStmt['TruncateStmt'], context: DeparserContext): string {
+    const rels = ListUtils.unwrapList(node.relations).map(r => this.visit(r, context)).join(', ');
+    const parts: string[] = ['TRUNCATE', rels];
+
+    if (node.restart_seqs) {
+      parts.push('RESTART IDENTITY');
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
   }
 }
