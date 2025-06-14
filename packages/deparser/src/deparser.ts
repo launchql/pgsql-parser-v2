@@ -3201,4 +3201,359 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  GrantStmt(node: t.GrantStmt['GrantStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.is_grant) {
+      output.push('GRANT');
+    } else {
+      output.push('REVOKE');
+    }
+
+    if (node.privileges && node.privileges.length > 0) {
+      const privileges = ListUtils.unwrapList(node.privileges)
+        .map(priv => this.visit(priv, context))
+        .join(', ');
+      output.push(privileges);
+    } else {
+      output.push('ALL PRIVILEGES');
+    }
+
+    output.push('ON');
+
+    switch (node.targtype) {
+      case 'ACL_TARGET_OBJECT':
+        if (node.objects && node.objects.length > 0) {
+          const objects = ListUtils.unwrapList(node.objects)
+            .map(obj => this.visit(obj, context))
+            .join(', ');
+          output.push(objects);
+        }
+        break;
+      case 'ACL_TARGET_ALL_IN_SCHEMA':
+        output.push('ALL TABLES IN SCHEMA');
+        if (node.objects && node.objects.length > 0) {
+          const schemas = ListUtils.unwrapList(node.objects)
+            .map(schema => this.visit(schema, context))
+            .join(', ');
+          output.push(schemas);
+        }
+        break;
+      default:
+        if (node.objects && node.objects.length > 0) {
+          const objects = ListUtils.unwrapList(node.objects)
+            .map(obj => this.visit(obj, context))
+            .join(', ');
+          output.push(objects);
+        }
+    }
+
+    if (node.is_grant) {
+      output.push('TO');
+    } else {
+      output.push('FROM');
+    }
+
+    if (node.grantees && node.grantees.length > 0) {
+      const grantees = ListUtils.unwrapList(node.grantees)
+        .map(grantee => this.visit(grantee, context))
+        .join(', ');
+      output.push(grantees);
+    }
+
+    if (node.grant_option && node.is_grant) {
+      output.push('WITH GRANT OPTION');
+    } else if (node.grant_option && !node.is_grant) {
+      output.push('GRANT OPTION FOR');
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      output.push('CASCADE');
+    } else if (node.behavior === 'DROP_RESTRICT') {
+      output.push('RESTRICT');
+    }
+
+    return output.join(' ');
+  }
+
+  GrantRoleStmt(node: t.GrantRoleStmt['GrantRoleStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.is_grant) {
+      output.push('GRANT');
+    } else {
+      output.push('REVOKE');
+    }
+
+    if (node.granted_roles && node.granted_roles.length > 0) {
+      const roles = ListUtils.unwrapList(node.granted_roles)
+        .map(role => this.visit(role, context))
+        .join(', ');
+      output.push(roles);
+    }
+
+    if (node.is_grant) {
+      output.push('TO');
+    } else {
+      output.push('FROM');
+    }
+
+    if (node.grantee_roles && node.grantee_roles.length > 0) {
+      const grantees = ListUtils.unwrapList(node.grantee_roles)
+        .map(grantee => this.visit(grantee, context))
+        .join(', ');
+      output.push(grantees);
+    }
+
+    if (node.opt && node.is_grant) {
+      output.push('WITH ADMIN OPTION');
+    } else if (node.opt && !node.is_grant) {
+      output.push('ADMIN OPTION FOR');
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      output.push('CASCADE');
+    } else if (node.behavior === 'DROP_RESTRICT') {
+      output.push('RESTRICT');
+    }
+
+    return output.join(' ');
+  }
+
+  SecLabelStmt(node: t.SecLabelStmt['SecLabelStmt'], context: DeparserContext): string {
+    const output: string[] = ['SECURITY LABEL'];
+
+    if (node.provider) {
+      output.push('FOR', QuoteUtils.quote(node.provider));
+    }
+
+    output.push('ON');
+
+    if (node.objtype) {
+      switch (node.objtype) {
+        case 'OBJECT_TABLE':
+          output.push('TABLE');
+          break;
+        case 'OBJECT_COLUMN':
+          output.push('COLUMN');
+          break;
+        case 'OBJECT_FUNCTION':
+          output.push('FUNCTION');
+          break;
+        case 'OBJECT_SCHEMA':
+          output.push('SCHEMA');
+          break;
+        case 'OBJECT_DATABASE':
+          output.push('DATABASE');
+          break;
+        case 'OBJECT_ROLE':
+          output.push('ROLE');
+          break;
+        default:
+          output.push(node.objtype.replace('OBJECT_', ''));
+      }
+    }
+
+    if (node.object) {
+      output.push(this.visit(node.object, context));
+    }
+
+    output.push('IS');
+
+    if (node.label) {
+      output.push(`'${node.label}'`);
+    } else {
+      output.push('NULL');
+    }
+
+    return output.join(' ');
+  }
+
+  AlterDefaultPrivilegesStmt(node: t.AlterDefaultPrivilegesStmt['AlterDefaultPrivilegesStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER DEFAULT PRIVILEGES'];
+
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options);
+      for (const option of options) {
+        const optionData = this.getNodeData(option);
+        if (optionData.defname === 'schemas') {
+          output.push('IN SCHEMA');
+          if (optionData.arg) {
+            const schemas = ListUtils.unwrapList(optionData.arg)
+              .map(schema => this.visit(schema, context))
+              .join(', ');
+            output.push(schemas);
+          }
+        } else if (optionData.defname === 'roles') {
+          output.push('FOR ROLE');
+          if (optionData.arg) {
+            const roles = ListUtils.unwrapList(optionData.arg)
+              .map(role => this.visit(role, context))
+              .join(', ');
+            output.push(roles);
+          }
+        }
+      }
+    }
+
+    if (node.action) {
+      const actionStr = this.visit(node.action, context);
+      output.push(actionStr);
+    }
+
+    return output.join(' ');
+  }
+
+  CreateConversionStmt(node: t.CreateConversionStmt['CreateConversionStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+
+    if (node.def) {
+      output.push('DEFAULT');
+    }
+
+    output.push('CONVERSION');
+
+    if (node.conversion_name && node.conversion_name.length > 0) {
+      const conversionName = ListUtils.unwrapList(node.conversion_name)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(QuoteUtils.quote(conversionName));
+    }
+
+    if (node.for_encoding_name) {
+      output.push('FOR', `'${node.for_encoding_name}'`);
+    }
+
+    if (node.to_encoding_name) {
+      output.push('TO', `'${node.to_encoding_name}'`);
+    }
+
+    if (node.func_name && node.func_name.length > 0) {
+      output.push('FROM');
+      const funcName = ListUtils.unwrapList(node.func_name)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(funcName);
+    }
+
+    return output.join(' ');
+  }
+
+  CreateCastStmt(node: t.CreateCastStmt['CreateCastStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE CAST'];
+
+    output.push('(');
+    if (node.sourcetype) {
+      output.push(this.visit(node.sourcetype, context));
+    }
+    output.push('AS');
+    if (node.targettype) {
+      output.push(this.visit(node.targettype, context));
+    }
+    output.push(')');
+
+    if (node.func) {
+      output.push('WITH FUNCTION');
+      output.push(this.visit(node.func, context));
+    } else if (node.inout) {
+      output.push('WITH INOUT');
+    } else {
+      output.push('WITHOUT FUNCTION');
+    }
+
+    if (node.context === 'COERCION_IMPLICIT') {
+      output.push('AS IMPLICIT');
+    } else if (node.context === 'COERCION_ASSIGNMENT') {
+      output.push('AS ASSIGNMENT');
+    }
+
+    return output.join(' ');
+  }
+
+  CreatePLangStmt(node: t.CreatePLangStmt['CreatePLangStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+
+    if (node.replace) {
+      output.push('OR REPLACE');
+    }
+
+    if (node.pltrusted) {
+      output.push('TRUSTED');
+    }
+
+    output.push('LANGUAGE');
+
+    if (node.plname) {
+      output.push(QuoteUtils.quote(node.plname));
+    }
+
+    if (node.plhandler && node.plhandler.length > 0) {
+      output.push('HANDLER');
+      const handlerName = ListUtils.unwrapList(node.plhandler)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(handlerName);
+    }
+
+    if (node.plinline && node.plinline.length > 0) {
+      output.push('INLINE');
+      const inlineName = ListUtils.unwrapList(node.plinline)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(inlineName);
+    }
+
+    if (node.plvalidator && node.plvalidator.length > 0) {
+      output.push('VALIDATOR');
+      const validatorName = ListUtils.unwrapList(node.plvalidator)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(validatorName);
+    }
+
+    return output.join(' ');
+  }
+
+  CreateTransformStmt(node: t.CreateTransformStmt['CreateTransformStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+
+    if (node.replace) {
+      output.push('OR REPLACE');
+    }
+
+    output.push('TRANSFORM FOR');
+
+    if (node.type_name) {
+      output.push(this.visit(node.type_name, context));
+    }
+
+    output.push('LANGUAGE');
+
+    if (node.lang) {
+      output.push(QuoteUtils.quote(node.lang));
+    }
+
+    output.push('(');
+
+    const transforms: string[] = [];
+    if (node.fromsql) {
+      const fromSqlName = ListUtils.unwrapList(node.fromsql)
+        .map(name => this.visit(name, context))
+        .join('.');
+      transforms.push(`FROM SQL WITH FUNCTION ${fromSqlName}`);
+    }
+
+    if (node.tosql) {
+      const toSqlName = ListUtils.unwrapList(node.tosql)
+        .map(name => this.visit(name, context))
+        .join('.');
+      transforms.push(`TO SQL WITH FUNCTION ${toSqlName}`);
+    }
+
+    output.push(transforms.join(', '));
+    output.push(')');
+
+    return output.join(' ');
+  }
 }
