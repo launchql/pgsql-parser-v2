@@ -716,7 +716,7 @@ export class Deparser implements DeparserVisitor {
     return output.join(' ');
   }
 
-  RangeVar(node: t.RangeVar['RangeVar'], context: DeparserContext): string {
+  RangeVar(node: t.RangeVar, context: DeparserContext): string {
     let relation = '';
 
     if (node.schemaname) {
