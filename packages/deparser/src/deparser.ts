@@ -3809,34 +3809,186 @@ export class Deparser implements DeparserVisitor {
 
   MergeStmt(node: t.MergeStmt['MergeStmt'], context: DeparserContext): string {
     const output: string[] = [];
-
+    
     if (node.withClause) {
       output.push(this.visit(node.withClause, context));
     }
-
+    
     output.push('MERGE INTO');
-
+    
     if (node.relation) {
       output.push(this.visit(node.relation, context));
     }
-
+    
     if (node.sourceRelation) {
       output.push('USING');
       output.push(this.visit(node.sourceRelation, context));
     }
-
+    
     if (node.joinCondition) {
       output.push('ON');
       output.push(this.visit(node.joinCondition, context));
     }
-
+    
     if (node.mergeWhenClauses && node.mergeWhenClauses.length > 0) {
       const whenClauses = ListUtils.unwrapList(node.mergeWhenClauses)
         .map(clause => this.visit(clause, context))
         .join(' ');
       output.push(whenClauses);
     }
+    
+    return output.join(' ');
+  }
 
+  AlterTableMoveAllStmt(node: t.AlterTableMoveAllStmt['AlterTableMoveAllStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER'];
+    
+    if (node.objtype === 'OBJECT_TABLE') {
+      output.push('TABLE');
+    } else if (node.objtype === 'OBJECT_INDEX') {
+      output.push('INDEX');
+    } else {
+      output.push('TABLE');
+    }
+    
+    output.push('ALL', 'IN', 'TABLESPACE');
+    
+    if (node.orig_tablespacename) {
+      output.push(QuoteUtils.quote(node.orig_tablespacename));
+    }
+    
+    output.push('SET', 'TABLESPACE');
+    
+    if (node.new_tablespacename) {
+      output.push(QuoteUtils.quote(node.new_tablespacename));
+    }
+    
+    if (node.nowait) {
+      output.push('NOWAIT');
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateSeqStmt(node: t.CreateSeqStmt['CreateSeqStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'SEQUENCE'];
+    
+    if (node.if_not_exists) {
+      output.push('IF NOT EXISTS');
+    }
+    
+    if (node.sequence) {
+      output.push(this.visit(node.sequence, context));
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const optionStrs = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push(optionStrs);
+    }
+    
+    return output.join(' ');
+  }
+
+  AlterSeqStmt(node: t.AlterSeqStmt['AlterSeqStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'SEQUENCE'];
+    
+    if (node.missing_ok) {
+      output.push('IF EXISTS');
+    }
+    
+    if (node.sequence) {
+      output.push(this.visit(node.sequence, context));
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const optionStrs = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push(optionStrs);
+    }
+    
+    if (node.for_identity) {
+      output.push('FOR IDENTITY');
+    }
+    
+    return output.join(' ');
+  }
+
+  CompositeTypeStmt(node: t.CompositeTypeStmt['CompositeTypeStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'TYPE'];
+    
+    if (node.typevar) {
+      output.push(this.visit(node.typevar, context));
+    }
+    
+    output.push('AS');
+    
+    if (node.coldeflist && node.coldeflist.length > 0) {
+      const colDefs = ListUtils.unwrapList(node.coldeflist)
+        .map(colDef => this.visit(colDef, context))
+        .join(', ');
+      output.push(`(${colDefs})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateRangeStmt(node: t.CreateRangeStmt['CreateRangeStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'TYPE'];
+    
+    if (node.typeName && node.typeName.length > 0) {
+      const typeNameStr = ListUtils.unwrapList(node.typeName)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(typeNameStr);
+    }
+    
+    output.push('AS', 'RANGE');
+    
+    if (node.params && node.params.length > 0) {
+      const paramStrs = ListUtils.unwrapList(node.params).map(param => {
+        const paramData = this.getNodeData(param);
+        if (paramData.defname && paramData.arg) {
+          const argValue = this.visit(paramData.arg, context);
+          return `${paramData.defname} = ${argValue}`;
+        }
+        return this.visit(param, context);
+      });
+      output.push(`(${paramStrs.join(', ')})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  AlterEnumStmt(node: t.AlterEnumStmt['AlterEnumStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'TYPE'];
+    
+    if (node.typeName && node.typeName.length > 0) {
+      const typeNameStr = ListUtils.unwrapList(node.typeName)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(typeNameStr);
+    }
+    
+    if (node.oldVal && node.newVal) {
+      output.push('RENAME', 'VALUE', `'${node.oldVal}'`, 'TO', `'${node.newVal}'`);
+    } else if (node.newVal) {
+      output.push('ADD', 'VALUE');
+      if (node.skipIfNewValExists) {
+        output.push('IF NOT EXISTS');
+      }
+      output.push(`'${node.newVal}'`);
+      if (node.newValNeighbor) {
+        if (node.newValIsAfter) {
+          output.push('AFTER', `'${node.newValNeighbor}'`);
+        } else {
+          output.push('BEFORE', `'${node.newValNeighbor}'`);
+        }
+      }
+    }
+    
     return output.join(' ');
   }
 }
