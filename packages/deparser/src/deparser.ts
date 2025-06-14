@@ -1676,7 +1676,7 @@ export class Deparser implements DeparserVisitor {
       parts.push(this.visit(node.table, context));
     }
 
-    if (node.permissive === false) {
+    if (node.permissive === false || node.permissive === undefined) {
       parts.push('AS RESTRICTIVE');
     }
 
