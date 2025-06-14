@@ -64,6 +64,16 @@ export const cleanTree = (tree: any) => {
     stmt_len: noop,
     stmt_location: noop,
     location: noop,
+    RangeVar: (obj: any) => {
+      if (obj.inh === true) delete obj.inh;
+      if (obj.relpersistence === 'p') delete obj.relpersistence;
+      return cleanTree(obj);
+    },
+    IndexElem: (obj: any) => {
+      if (obj.ordering === 'SORTBY_DEFAULT') delete obj.ordering;
+      if (obj.nulls_ordering === 'SORTBY_NULLS_DEFAULT') delete obj.nulls_ordering;
+      return cleanTree(obj);
+    },
     DefElem: (obj: any) => {
       if (obj.defname === 'as') {
         if (Array.isArray(obj.arg) && obj.arg.length) {
@@ -76,10 +86,9 @@ export const cleanTree = (tree: any) => {
           // do stmt
           obj.arg.String.str = obj.arg.String.str.trim();
         }
-        return cleanTree(obj);
-      } else {
-        return cleanTree(obj);
       }
+      if (obj.defaction === 'DEFELEM_UNSPEC') delete obj.defaction;
+      return cleanTree(obj);
     }
   });
 };
