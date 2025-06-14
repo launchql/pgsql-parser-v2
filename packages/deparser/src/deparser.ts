@@ -580,6 +580,12 @@ export class Deparser implements DeparserVisitor {
     return result;
   }
 
+  FuncExpr(node: t.FuncExpr['FuncExpr'], context: DeparserContext): string {
+    const funcName = `func_${node.funcid}`;
+    const args = node.args ? ListUtils.unwrapList(node.args).map(arg => this.visit(arg, context)).join(', ') : '';
+    return `${funcName}(${args})`;
+  }
+
   A_Const(node: t.A_Const['A_Const'], context: DeparserContext): string {
     const nodeAny = node as any;
     if (nodeAny.val) {
@@ -1756,7 +1762,7 @@ export class Deparser implements DeparserVisitor {
     }
 
     if (node.schemaname) {
-      output.push(QuoteUtils.quote(node.schemaname));
+      output.push(node.schemaname);
     }
 
     if (node.authrole) {
@@ -1843,7 +1849,11 @@ export class Deparser implements DeparserVisitor {
         if (Array.isArray(objList)) {
           return objList.map(obj => this.visit(obj, context)).join('.');
         }
-        return this.visit(objList, context);
+        const objName = this.visit(objList, context);
+        if (node.removeType === 'OBJECT_SCHEMA' || node.removeType === 'OBJECT_DATABASE') {
+          return `'${objName}'`;
+        }
+        return objName;
       }).join(', ');
       output.push(objects);
     }
@@ -2087,6 +2097,17 @@ export class Deparser implements DeparserVisitor {
             output.push('RESTRICT');
           }
           break;
+        case 'AT_SetRelOptions':
+          output.push('SET');
+          if (node.def && Array.isArray(node.def)) {
+            const options = ListUtils.unwrapList(node.def)
+              .map(option => this.visit(option, context))
+              .join(', ');
+            output.push(`(${options})`);
+          } else {
+            output.push('()');
+          }
+          break;
         default:
           throw new Error(`Unsupported AlterTableCmd subtype: ${node.subtype}`);
       }
@@ -2275,8 +2296,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options) {
+      const roleContext = { ...context, parentNodeType: 'CreateRoleStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, roleContext))
         .join(' ');
       if (options) {
         output.push(options);
@@ -2287,26 +2309,68 @@ export class Deparser implements DeparserVisitor {
   }
 
   DefElem(node: t.DefElem['DefElem'], context: DeparserContext): string {
-    const output: string[] = [];
-    
-    if (node.defname) {
-      const defName = node.defname.toUpperCase();
-      
-      if (node.arg) {
-        const argValue = this.visit(node.arg, context);
-        if (argValue === 'true') {
-          output.push(defName);
-        } else if (argValue === 'false') {
-          output.push(`NO${defName}`);
-        } else {
-          output.push(`${defName} ${argValue}`);
-        }
-      } else {
-        output.push(defName);
-      }
+    if (!node.defname) {
+      return '';
     }
     
-    return output.join(' ');
+    if (node.arg) {
+      const argValue = this.visit(node.arg, context);
+      
+      const parentContext = context.parentNodeType;
+      
+      if (parentContext === 'CreatedbStmt' || parentContext === 'DropdbStmt') {
+        const quotedValue = typeof argValue === 'string' 
+          ? QuoteUtils.escape(argValue) 
+          : argValue;
+        return `${node.defname} = ${quotedValue}`;
+      }
+      
+      if (parentContext === 'CreateRoleStmt' || parentContext === 'AlterRoleStmt') {
+        if (argValue === 'true') {
+          return node.defname.toUpperCase();
+        } else if (argValue === 'false') {
+          return `NO${node.defname.toUpperCase()}`;
+        }
+      }
+      
+      if (parentContext === 'CreateSeqStmt' || parentContext === 'AlterSeqStmt') {
+        return `${node.defname.toUpperCase()} ${argValue}`;
+      }
+      
+      if (parentContext === 'CreateTableSpaceStmt' || parentContext === 'AlterTableSpaceOptionsStmt') {
+        return `${node.defname.toUpperCase()} ${argValue}`;
+      }
+      
+      if (parentContext === 'CreateExtensionStmt' || parentContext === 'AlterExtensionStmt' || parentContext === 'CreateFdwStmt') {
+        // AlterExtensionStmt specific cases
+        if (parentContext === 'AlterExtensionStmt') {
+          if (node.defname === 'to') {
+            return `TO ${argValue}`;
+          }
+          if (node.defname === 'schema') {
+            return `SCHEMA ${argValue}`;
+          }
+        }
+        
+        // CreateFdwStmt specific cases
+        if (parentContext === 'CreateFdwStmt') {
+          if (['handler', 'validator'].includes(node.defname)) {
+            return `${node.defname.toUpperCase()} ${argValue}`;
+          }
+          return `${node.defname.toUpperCase()} ${argValue}`;
+        }
+        
+        // CreateExtensionStmt cases (schema, version, etc.)
+        return `${node.defname.toUpperCase()} ${argValue}`;
+      }
+      
+      const quotedValue = typeof argValue === 'string' 
+        ? QuoteUtils.escape(argValue) 
+        : argValue;
+      return `${node.defname} = ${quotedValue}`;
+    }
+    
+    return node.defname.toUpperCase();
   }
 
   CreateTableSpaceStmt(node: t.CreateTableSpaceStmt['CreateTableSpaceStmt'], context: DeparserContext): string {
@@ -2328,8 +2392,9 @@ export class Deparser implements DeparserVisitor {
     
     if (node.options && node.options.length > 0) {
       output.push('WITH');
+      const tsContext = { ...context, parentNodeType: 'CreateTableSpaceStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, tsContext))
         .join(', ');
       output.push(`(${options})`);
     }
@@ -2365,8 +2430,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options && node.options.length > 0) {
+      const tablespaceContext = { ...context, parentNodeType: 'AlterTableSpaceOptionsStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, tablespaceContext))
         .join(', ');
       output.push(`(${options})`);
     }
@@ -2386,8 +2452,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options && node.options.length > 0) {
+      const extContext = { ...context, parentNodeType: 'CreateExtensionStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, extContext))
         .join(' ');
       output.push(options);
     }
@@ -2403,8 +2470,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options && node.options.length > 0) {
+      const extContext = { ...context, parentNodeType: 'AlterExtensionStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, extContext))
         .join(' ');
       output.push(options);
     }
@@ -2420,16 +2488,18 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.func_options && node.func_options.length > 0) {
+      const fdwContext = { ...context, parentNodeType: 'CreateFdwStmt' };
       const funcOptions = ListUtils.unwrapList(node.func_options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, fdwContext))
         .join(' ');
       output.push(funcOptions);
     }
     
     if (node.options && node.options.length > 0) {
       output.push('OPTIONS');
+      const fdwContext = { ...context, parentNodeType: 'CreateFdwStmt' };
       const options = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, fdwContext))
         .join(', ');
       output.push(`(${options})`);
     }
@@ -2767,7 +2837,7 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['CREATE', 'POLICY'];
     
     if (node.policy_name) {
-      output.push(QuoteUtils.quote(node.policy_name));
+      output.push(`"${node.policy_name}"`);
     }
     
     output.push('ON');
@@ -2800,11 +2870,13 @@ export class Deparser implements DeparserVisitor {
   }
 
   CreateUserMappingStmt(node: t.CreateUserMappingStmt['CreateUserMappingStmt'], context: DeparserContext): string {
-    const output: string[] = ['CREATE', 'USER', 'MAPPING'];
+    const output: string[] = ['CREATE'];
     
     if (node.if_not_exists) {
-      output.splice(2, 0, 'IF NOT EXISTS');
+      output.push('IF', 'NOT', 'EXISTS');
     }
+    
+    output.push('USER', 'MAPPING');
     
     output.push('FOR');
     
@@ -2817,7 +2889,7 @@ export class Deparser implements DeparserVisitor {
     output.push('SERVER');
     
     if (node.servername) {
-      output.push(QuoteUtils.quote(node.servername));
+      output.push(`"${node.servername}"`);
     }
     
     if (node.options && node.options.length > 0) {
@@ -2830,11 +2902,13 @@ export class Deparser implements DeparserVisitor {
   }
 
   CreateStatsStmt(node: t.CreateStatsStmt['CreateStatsStmt'], context: DeparserContext): string {
-    const output: string[] = ['CREATE', 'STATISTICS'];
+    const output: string[] = ['CREATE'];
     
     if (node.if_not_exists) {
-      output.splice(2, 0, 'IF NOT EXISTS');
+      output.push('IF', 'NOT', 'EXISTS');
     }
+    
+    output.push('STATISTICS');
     
     if (node.defnames && node.defnames.length > 0) {
       const names = ListUtils.unwrapList(node.defnames).map(name => this.visit(name, context));
@@ -2842,10 +2916,8 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.stat_types && node.stat_types.length > 0) {
-      output.push('(');
       const types = ListUtils.unwrapList(node.stat_types).map(type => this.visit(type, context));
-      output.push(types.join(', '));
-      output.push(')');
+      output.push(`(${types.join(', ')})`);
     }
     
     output.push('ON');
@@ -2868,7 +2940,7 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['CREATE', 'PUBLICATION'];
     
     if (node.pubname) {
-      output.push(QuoteUtils.quote(node.pubname));
+      output.push(`"${node.pubname}"`);
     }
     
     if (node.pubobjects && node.pubobjects.length > 0) {
@@ -2892,7 +2964,7 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['CREATE', 'SUBSCRIPTION'];
     
     if (node.subname) {
-      output.push(QuoteUtils.quote(node.subname));
+      output.push(`"${node.subname}"`);
     }
     
     output.push('CONNECTION');
@@ -2924,15 +2996,13 @@ export class Deparser implements DeparserVisitor {
       output.push(this.visit(node.relation, context));
       
       if (node.indexname) {
-        output.push('USING', QuoteUtils.quote(node.indexname));
+        output.push('USING', `"${node.indexname}"`);
       }
     }
     
     if (node.params && node.params.length > 0) {
-      output.push('(');
       const params = ListUtils.unwrapList(node.params).map(param => this.visit(param, context));
-      output.push(params.join(', '));
-      output.push(')');
+      output.push(`(${params.join(', ')})`);
     }
     
     return output.join(' ');
@@ -2942,10 +3012,8 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['VACUUM'];
     
     if (node.options && node.options.length > 0) {
-      output.push('(');
       const options = ListUtils.unwrapList(node.options).map(option => this.visit(option, context));
-      output.push(options.join(', '));
-      output.push(')');
+      output.push(`(${options.join(', ')})`);
     }
     
     if (node.rels && node.rels.length > 0) {
@@ -2973,10 +3041,8 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['EXPLAIN'];
     
     if (node.options && node.options.length > 0) {
-      output.push('(');
       const options = ListUtils.unwrapList(node.options).map(option => this.visit(option, context));
-      output.push(options.join(', '));
-      output.push(')');
+      output.push(`(${options.join(', ')})`);
     }
     
     if (node.query) {
@@ -3016,14 +3082,12 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.name) {
-      output.push(QuoteUtils.quote(node.name));
+      output.push(`"${node.name}"`);
     }
     
     if (node.params && node.params.length > 0) {
-      output.push('(');
       const params = ListUtils.unwrapList(node.params).map(param => this.visit(param, context));
-      output.push(params.join(', '));
-      output.push(')');
+      output.push(`(${params.join(', ')})`);
     }
     
     return output.join(' ');
@@ -3050,7 +3114,7 @@ export class Deparser implements DeparserVisitor {
       throw new Error('CreatedbStmt requires dbname');
     }
     
-    output.push(QuoteUtils.quote(node.dbname));
+    output.push(`"${node.dbname}"`);
     
     if (node.options && node.options.length > 0) {
       const options = ListUtils.unwrapList(node.options)
@@ -3073,7 +3137,7 @@ export class Deparser implements DeparserVisitor {
       throw new Error('DropdbStmt requires dbname');
     }
     
-    output.push(QuoteUtils.quote(node.dbname));
+    output.push(`"${node.dbname}"`);
     
     if (node.options && node.options.length > 0) {
       const options = ListUtils.unwrapList(node.options)
@@ -3135,7 +3199,7 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.renameType === 'OBJECT_COLUMN' && node.subname) {
-      output.push('RENAME COLUMN', QuoteUtils.quote(node.subname));
+      output.push('RENAME COLUMN', `"${node.subname}"`);
     } else {
       output.push('RENAME TO');
     }
@@ -3144,7 +3208,7 @@ export class Deparser implements DeparserVisitor {
       throw new Error('RenameStmt requires newname');
     }
     
-    output.push(QuoteUtils.quote(node.newname));
+    output.push(`"${node.newname}"`);
     
     return output.join(' ');
   }
@@ -3306,9 +3370,9 @@ export class Deparser implements DeparserVisitor {
       output.push(grantees);
     }
 
-    if (node.opt && node.is_grant) {
+    if (node.opt && node.opt.length > 0 && node.is_grant) {
       output.push('WITH ADMIN OPTION');
-    } else if (node.opt && !node.is_grant) {
+    } else if (node.opt && node.opt.length > 0 && !node.is_grant) {
       output.push('ADMIN OPTION FOR');
     }
 
@@ -3325,7 +3389,7 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['SECURITY LABEL'];
 
     if (node.provider) {
-      output.push('FOR', QuoteUtils.quote(node.provider));
+      output.push('FOR', `"${node.provider}"`);
     }
 
     output.push('ON');
@@ -3882,8 +3946,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options && node.options.length > 0) {
+      const seqContext = { ...context, parentNodeType: 'CreateSeqStmt' };
       const optionStrs = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, seqContext))
         .join(' ');
       output.push(optionStrs);
     }
@@ -3903,8 +3968,9 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.options && node.options.length > 0) {
+      const seqContext = { ...context, parentNodeType: 'AlterSeqStmt' };
       const optionStrs = ListUtils.unwrapList(node.options)
-        .map(option => this.visit(option, context))
+        .map(option => this.visit(option, seqContext))
         .join(' ');
       output.push(optionStrs);
     }

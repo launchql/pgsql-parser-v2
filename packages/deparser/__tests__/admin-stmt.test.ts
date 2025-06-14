@@ -56,7 +56,7 @@ describe('Administrative Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('CALL <function_expression>');
+      expect(deparser.visit(ast, context)).toBe('CALL func_12345()');
     });
 
     it('should throw error for CALL statement without function', () => {

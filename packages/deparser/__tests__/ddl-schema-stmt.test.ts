@@ -16,7 +16,7 @@ describe('DDL Schema Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA "test_schema"');
+      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA test_schema');
     });
 
     it('should deparse CREATE SCHEMA IF NOT EXISTS statement', () => {
@@ -29,7 +29,7 @@ describe('DDL Schema Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA IF NOT EXISTS "test_schema"');
+      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA IF NOT EXISTS test_schema');
     });
 
     it('should deparse CREATE SCHEMA with AUTHORIZATION', () => {
@@ -48,7 +48,7 @@ describe('DDL Schema Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA "test_schema" AUTHORIZATION test_user');
+      expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA test_schema AUTHORIZATION test_user');
     });
 
     it('should deparse CREATE SCHEMA without schema name', () => {
