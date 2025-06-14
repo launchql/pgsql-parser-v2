@@ -268,7 +268,7 @@ describe('CREATE TABLE statements', () => {
                               },
                               rexpr: {
                                 A_Const: {
-                                  ival: {}
+                                  ival: { ival: 0 }
                                 }
                               }
                             }
