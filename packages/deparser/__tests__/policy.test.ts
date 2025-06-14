@@ -10,6 +10,7 @@ describe('policy statements', () => {
             policy_name: 'user_active',
             table: { relname: 'users' },
             cmd_name: 'select',
+            permissive: true,
             roles: [
               { RoleSpec: { roletype: 'ROLESPEC_PUBLIC' } }
             ],
