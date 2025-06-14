@@ -3806,4 +3806,37 @@ export class Deparser implements DeparserVisitor {
 
     return output.join(' ');
   }
+
+  MergeStmt(node: t.MergeStmt['MergeStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+
+    if (node.withClause) {
+      output.push(this.visit(node.withClause, context));
+    }
+
+    output.push('MERGE INTO');
+
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    }
+
+    if (node.sourceRelation) {
+      output.push('USING');
+      output.push(this.visit(node.sourceRelation, context));
+    }
+
+    if (node.joinCondition) {
+      output.push('ON');
+      output.push(this.visit(node.joinCondition, context));
+    }
+
+    if (node.mergeWhenClauses && node.mergeWhenClauses.length > 0) {
+      const whenClauses = ListUtils.unwrapList(node.mergeWhenClauses)
+        .map(clause => this.visit(clause, context))
+        .join(' ');
+      output.push(whenClauses);
+    }
+
+    return output.join(' ');
+  }
 }
