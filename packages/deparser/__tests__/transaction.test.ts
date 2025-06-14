@@ -56,7 +56,7 @@ describe('transaction and drop statements', () => {
       RawStmt: {
         stmt: {
           TruncateStmt: {
-            relations: [{ RangeVar: { relname: 'logs' } }],
+            relations: [{ relname: 'logs' }],
             restart_seqs: true,
             behavior: 'DROP_CASCADE'
           }

@@ -1,0 +1,7 @@
+{
+  "CreateStmt": ["relation"],
+  "IndexStmt": ["relation"],
+  "VacuumRelation": ["relation"],
+  "TruncateStmt": ["relations"],
+  "GrantStmt": ["objects"]
+}

@@ -7,7 +7,7 @@ describe('index and schema statements', () => {
         stmt: {
           IndexStmt: {
             idxname: 'idx_users_name',
-            relation: { RangeVar: { relname: 'users' } },
+            relation: { relname: 'users' },
             accessMethod: 'btree',
             unique: true,
             indexParams: [

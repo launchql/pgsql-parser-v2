@@ -10,11 +10,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -54,11 +52,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -89,11 +85,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'temp_data',
-                  inh: true,
-                  relpersistence: 't'
-                }
+                relname: 'temp_data',
+                inh: true,
+                relpersistence: 't'
               },
               tableElts: [
                 {
@@ -123,12 +117,10 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  schemaname: 'public',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                schemaname: 'public',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -160,11 +152,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'orders',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'orders',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -202,11 +192,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'customers',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'customers',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -237,11 +225,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -296,11 +282,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -339,11 +323,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'settings',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'settings',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -380,11 +362,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -421,11 +401,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'features',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'features',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -464,11 +442,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'mixed_types',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'mixed_types',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -536,11 +512,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'composite_key',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'composite_key',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -585,11 +559,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {

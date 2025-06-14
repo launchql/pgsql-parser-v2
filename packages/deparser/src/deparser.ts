@@ -4,6 +4,7 @@ import { DeparserContext, DeparserVisitor } from './visitors/base';
 import { QuoteUtils } from './utils/quote-utils';
 import { ListUtils } from './utils/list-utils';
 import typeNameProperties from './type-name-properties.json';
+import rangeVarProperties from './range-var-properties.json';
 import * as t from '@pgsql/utils/wrapped';
 export interface DeparserOptions {
   newline?: string;
@@ -64,6 +65,21 @@ export class Deparser implements DeparserVisitor {
       }
     }
 
+    // Unwrap RangeVar properties when they appear wrapped
+    const rangeProps = (rangeVarProperties as any)[nodeType];
+    if (rangeProps) {
+      for (const propName of rangeProps) {
+        if (nodeData[propName]) {
+          const value = nodeData[propName];
+          if (Array.isArray(value)) {
+            nodeData[propName] = value.map(v => (v && (v as any).RangeVar) ? v.RangeVar : v);
+          } else if (value.RangeVar) {
+            nodeData[propName] = value.RangeVar;
+          }
+        }
+      }
+    }
+
     const methodName = nodeType as keyof this;
     if (typeof this[methodName] === 'function') {
       return (this[methodName] as any)(nodeData, context);
@@ -73,12 +89,27 @@ export class Deparser implements DeparserVisitor {
   }
 
   getNodeType(node: Node): string {
+    if (this.isRangeVar(node)) {
+      return 'RangeVar';
+    }
     return Object.keys(node)[0];
   }
 
   getNodeData(node: Node): any {
     const type = this.getNodeType(node);
+    if (type === 'RangeVar' && !(node as any).RangeVar) {
+      return node;
+    }
     return (node as any)[type];
+  }
+
+  private isRangeVar(node: any): boolean {
+    return (
+      node &&
+      typeof node === 'object' &&
+      'relname' in node &&
+      typeof (node as any).relname === 'string'
+    );
   }
 
   RawStmt(node: t.RawStmt['RawStmt'], context: DeparserContext): string {

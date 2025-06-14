@@ -9,7 +9,7 @@ describe('maintenance and utility statements', () => {
             is_vacuumcmd: true,
             options: [{ DefElem: { defname: 'full' } }],
             rels: [
-              { VacuumRelation: { relation: { RangeVar: { relname: 'users' } } } }
+              { VacuumRelation: { relation: { relname: 'users' } } }
             ]
           }
         }
@@ -29,7 +29,7 @@ describe('maintenance and utility statements', () => {
             rels: [
               {
                 VacuumRelation: {
-                  relation: { RangeVar: { relname: 'books' } },
+                  relation: { relname: 'books' },
                   va_cols: [
                     { String: { sval: 'title' } },
                     { String: { sval: 'author' } }

@@ -39,6 +39,7 @@ The new TypeScript deparser lives in `packages/deparser/src/deparser.ts`. It tra
 - `SqlFormatter` – minimal helper for formatting
 
 `type-name-properties.json` lists AST properties that contain `TypeName` nodes. During visitation these properties are automatically unwrapped to avoid the double‐wrapping bug described in `packages/deparser/issues/typeName.md`.
+`range-var-properties.json` performs the same role for `RangeVar` fields, ensuring inlined relations are handled consistently whether or not they are wrapped in a `RangeVar` object.
 
 For reference, there is historical code in `packages/deparser/reference/deparser.ts` (PG13) and the PostgreSQL C implementation `packages/deparser/reference/postgres_deparse.c`. These show how PostgreSQL handles various node types.
 

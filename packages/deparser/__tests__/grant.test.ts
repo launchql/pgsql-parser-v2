@@ -9,7 +9,7 @@ describe('grant statements', () => {
             is_grant: true,
             targtype: 'ACL_TARGET_OBJECT',
             objtype: 'OBJECT_TABLE',
-            objects: [{ RangeVar: { relname: 'users' } }],
+            objects: [{ relname: 'users' }],
             privileges: [
               { AccessPriv: { priv_name: 'select' } }
             ],
@@ -34,7 +34,7 @@ describe('grant statements', () => {
             grant_option: true,
             targtype: 'ACL_TARGET_OBJECT',
             objtype: 'OBJECT_TABLE',
-            objects: [{ RangeVar: { relname: 'users' } }],
+            objects: [{ relname: 'users' }],
             privileges: [
               { AccessPriv: { priv_name: 'insert' } }
             ],
