@@ -1,16 +1,19 @@
 import { cleanTree } from '../src/utils';
 
-function unwrapRangeVars(node: any): any {
+function unwrapNode(node: any): any {
   if (Array.isArray(node)) {
-    return node.map(unwrapRangeVars);
+    return node.map(unwrapNode);
   }
   if (node && typeof node === 'object') {
     if (node.RangeVar && Object.keys(node).length === 1) {
-      return unwrapRangeVars(node.RangeVar);
+      return unwrapNode(node.RangeVar);
+    }
+    if (node.List && Object.keys(node).length === 1) {
+      return node.List.items ? unwrapNode(node.List.items) : [];
     }
     const out: any = {};
     for (const [k, v] of Object.entries(node)) {
-      out[k] = unwrapRangeVars(v);
+      out[k] = unwrapNode(v);
     }
     return out;
   }
@@ -37,6 +40,6 @@ export function expectAstMatchesParse(sql: string, ast: any) {
     ? parsed[0]?.RawStmt?.stmt ?? parsed[0]
     : parsed?.stmts?.[0]?.stmt ?? parsed;
   const inputStmt = ast?.RawStmt?.stmt ?? ast;
-  const normalize = (node: any) => unwrapRangeVars(cleanTree(node));
+  const normalize = (node: any) => unwrapNode(cleanTree(node));
   expect(normalize(inputStmt)).toEqual(normalize(parsedStmt));
 }

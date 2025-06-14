@@ -32,7 +32,6 @@ describe('grant statements', () => {
       RawStmt: {
         stmt: {
           GrantStmt: {
-            is_grant: false,
             grant_option: true,
             targtype: 'ACL_TARGET_OBJECT',
             objtype: 'OBJECT_TABLE',

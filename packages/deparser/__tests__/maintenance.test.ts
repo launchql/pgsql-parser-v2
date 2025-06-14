@@ -26,7 +26,6 @@ describe('maintenance and utility statements', () => {
       RawStmt: {
         stmt: {
           VacuumStmt: {
-            is_vacuumcmd: false,
             options: [{ DefElem: { defname: 'verbose' } }],
             rels: [
               {

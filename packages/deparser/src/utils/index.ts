@@ -66,8 +66,24 @@ export const transform = (obj: any, props: any): any => {
 
 const noop = (): undefined => undefined;
 
+function stripRangeDefaults(node: any): any {
+  if (Array.isArray(node)) {
+    return node.map(stripRangeDefaults);
+  }
+  if (node && typeof node === 'object') {
+    if ('relname' in node) {
+      if (node.inh === true) delete node.inh;
+      if (node.relpersistence === 'p') delete node.relpersistence;
+    }
+    for (const key of Object.keys(node)) {
+      node[key] = stripRangeDefaults(node[key]);
+    }
+  }
+  return node;
+}
+
 export const cleanTree = (tree: any) => {
-  return transform(tree, {
+  const cleaned = transform(tree, {
     stmt_len: noop,
     stmt_location: noop,
     location: noop,
@@ -96,13 +112,19 @@ export const cleanTree = (tree: any) => {
       }
       if (obj.defaction === 'DEFELEM_UNSPEC') delete obj.defaction;
       return cleanTree(obj);
+    },
+    ColumnDef: (obj: any) => {
+      if (obj.is_local === true) delete obj.is_local;
+      return cleanTree(obj);
     }
   });
+  return stripRangeDefaults(cleaned);
 };
 
 export const cleanTreeWithStmt = (tree: any) => {
-  return transform(tree, {
+  const cleaned = transform(tree, {
     stmt_location: noop,
     location: noop
   });
+  return stripRangeDefaults(cleaned);
 };
