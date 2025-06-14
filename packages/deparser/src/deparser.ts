@@ -612,6 +612,9 @@ export class Deparser implements DeparserVisitor {
       return node.ival.Integer.ival.toString();
     } else if (typeof node.ival === 'object' && 'ival' in node.ival) {
       return node.ival.ival.toString();
+    } else if (node.ival && typeof node.ival === 'object' && Object.keys(node.ival).length === 0) {
+      // libpg_query represents integer 0 as an empty object
+      return '0';
     } else if (node.fval?.Float?.fval !== undefined) {
       return node.fval.Float.fval;
     } else if (node.sval?.String?.sval !== undefined) {
