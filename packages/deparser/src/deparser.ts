@@ -1608,4 +1608,155 @@ export class Deparser implements DeparserVisitor {
 
     return parts.join(' ');
   }
+
+  DefElem(node: t.DefElem['DefElem'], context: DeparserContext): string {
+    let name = node.defname?.toUpperCase() || '';
+    if (node.defnamespace) {
+      name = `${node.defnamespace.toUpperCase()}.${name}`;
+    }
+
+    if (node.arg) {
+      const value = this.visit(node.arg, context);
+      return `${name} ${value}`.trim();
+    }
+
+    return name;
+  }
+
+  VariableSetStmt(node: t.VariableSetStmt['VariableSetStmt'], context: DeparserContext): string {
+    switch (node.kind) {
+      case 'VAR_SET_VALUE':
+        const vals = ListUtils.unwrapList(node.args).map(a => this.visit(a, context)).join(', ');
+        return `SET ${node.is_local ? 'LOCAL ' : ''}${node.name} = ${vals}`;
+      case 'VAR_SET_DEFAULT':
+        return `SET ${node.name} TO DEFAULT`;
+      case 'VAR_SET_CURRENT':
+        return `SET ${node.name} FROM CURRENT`;
+      case 'VAR_RESET':
+        return `RESET ${node.name}`;
+      case 'VAR_RESET_ALL':
+        return 'RESET ALL';
+      default:
+        const args = ListUtils.unwrapList(node.args).map(a => this.visit(a, context)).join(', ');
+        return `SET ${node.name} ${args}`.trim();
+    }
+  }
+
+  VariableShowStmt(node: t.VariableShowStmt['VariableShowStmt'], context: DeparserContext): string {
+    return `SHOW ${node.name}`;
+  }
+
+  CreateExtensionStmt(node: t.CreateExtensionStmt['CreateExtensionStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE EXTENSION'];
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.extname) {
+      parts.push(QuoteUtils.quote(node.extname));
+    }
+
+    if (node.options) {
+      const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+      if (opts.length) {
+        parts.push('WITH');
+        parts.push(opts.join(' '));
+      }
+    }
+
+    return parts.join(' ');
+  }
+
+  ExplainStmt(node: t.ExplainStmt['ExplainStmt'], context: DeparserContext): string {
+    const parts: string[] = ['EXPLAIN'];
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    if (node.query) {
+      parts.push(this.visit(node.query, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  VacuumStmt(node: t.VacuumStmt['VacuumStmt'], context: DeparserContext): string {
+    const parts: string[] = [node.is_vacuumcmd ? 'VACUUM' : 'ANALYZE'];
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    const rels = ListUtils.unwrapList(node.rels).map(r => {
+      const rel = this.getNodeData(r);
+      let relStr = this.visit(rel.relation, context);
+      const cols = ListUtils.unwrapList(rel.va_cols).map(c => this.visit(c, context));
+      if (cols.length) {
+        relStr += this.formatter.parens(cols.join(', '));
+      }
+      return relStr;
+    });
+
+    if (rels.length) {
+      parts.push(rels.join(', '));
+    }
+
+    return parts.join(' ');
+  }
+
+  LockStmt(node: t.LockStmt['LockStmt'], context: DeparserContext): string {
+    const rels = ListUtils.unwrapList(node.relations).map(r => this.visit(r, context)).join(', ');
+    const parts: string[] = ['LOCK TABLE', rels];
+
+    const modeMap: Record<number, string> = {
+      1: 'ACCESS SHARE',
+      2: 'ROW SHARE',
+      3: 'ROW EXCLUSIVE',
+      4: 'SHARE UPDATE EXCLUSIVE',
+      5: 'SHARE',
+      6: 'SHARE ROW EXCLUSIVE',
+      7: 'EXCLUSIVE',
+      8: 'ACCESS EXCLUSIVE'
+    };
+
+    if (node.mode && node.mode !== 8) {
+      const m = modeMap[node.mode];
+      if (m) {
+        parts.push('IN', m, 'MODE');
+      }
+    }
+
+    if (node.nowait) {
+      parts.push('NOWAIT');
+    }
+
+    return parts.join(' ');
+  }
+
+  CopyStmt(node: t.CopyStmt['CopyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['COPY'];
+
+    if (node.query) {
+      parts.push(this.formatter.parens(this.visit(node.query, context)));
+    } else if (node.relation) {
+      parts.push(this.visit(node.relation, context));
+    }
+
+    parts.push(node.is_from ? 'FROM' : 'TO');
+
+    if (node.filename) {
+      parts.push(QuoteUtils.escape(node.filename));
+    }
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    return parts.join(' ');
+  }
 }
