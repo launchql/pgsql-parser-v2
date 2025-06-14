@@ -3028,4 +3028,177 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  CallStmt(node: t.CallStmt['CallStmt'], context: DeparserContext): string {
+    const output: string[] = ['CALL'];
+    
+    if (node.funccall) {
+      output.push(this.visit(node.funccall, context));
+    } else if (node.funcexpr) {
+      output.push(this.visit(node.funcexpr, context));
+    } else {
+      throw new Error('CallStmt requires either funccall or funcexpr');
+    }
+    
+    return output.join(' ');
+  }
+
+  CreatedbStmt(node: t.CreatedbStmt['CreatedbStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE DATABASE'];
+    
+    if (!node.dbname) {
+      throw new Error('CreatedbStmt requires dbname');
+    }
+    
+    output.push(QuoteUtils.quote(node.dbname));
+    
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push('WITH', options);
+    }
+    
+    return output.join(' ');
+  }
+
+  DropdbStmt(node: t.DropdbStmt['DropdbStmt'], context: DeparserContext): string {
+    const output: string[] = ['DROP DATABASE'];
+    
+    if (node.missing_ok) {
+      output.push('IF EXISTS');
+    }
+    
+    if (!node.dbname) {
+      throw new Error('DropdbStmt requires dbname');
+    }
+    
+    output.push(QuoteUtils.quote(node.dbname));
+    
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push('WITH', options);
+    }
+    
+    return output.join(' ');
+  }
+
+  RenameStmt(node: t.RenameStmt['RenameStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER'];
+    
+    if (!node.renameType) {
+      throw new Error('RenameStmt requires renameType');
+    }
+    
+    switch (node.renameType) {
+      case 'OBJECT_TABLE':
+        output.push('TABLE');
+        break;
+      case 'OBJECT_VIEW':
+        output.push('VIEW');
+        break;
+      case 'OBJECT_INDEX':
+        output.push('INDEX');
+        break;
+      case 'OBJECT_SEQUENCE':
+        output.push('SEQUENCE');
+        break;
+      case 'OBJECT_FUNCTION':
+        output.push('FUNCTION');
+        break;
+      case 'OBJECT_PROCEDURE':
+        output.push('PROCEDURE');
+        break;
+      case 'OBJECT_SCHEMA':
+        output.push('SCHEMA');
+        break;
+      case 'OBJECT_DATABASE':
+        output.push('DATABASE');
+        break;
+      case 'OBJECT_COLUMN':
+        output.push('TABLE');
+        break;
+      default:
+        throw new Error(`Unsupported RenameStmt renameType: ${node.renameType}`);
+    }
+    
+    if (node.missing_ok) {
+      output.push('IF EXISTS');
+    }
+    
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    } else if (node.object) {
+      output.push(this.visit(node.object, context));
+    }
+    
+    if (node.renameType === 'OBJECT_COLUMN' && node.subname) {
+      output.push('RENAME COLUMN', QuoteUtils.quote(node.subname));
+    } else {
+      output.push('RENAME TO');
+    }
+    
+    if (!node.newname) {
+      throw new Error('RenameStmt requires newname');
+    }
+    
+    output.push(QuoteUtils.quote(node.newname));
+    
+    return output.join(' ');
+  }
+
+  AlterOwnerStmt(node: t.AlterOwnerStmt['AlterOwnerStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER'];
+    
+    if (!node.objectType) {
+      throw new Error('AlterOwnerStmt requires objectType');
+    }
+    
+    switch (node.objectType) {
+      case 'OBJECT_TABLE':
+        output.push('TABLE');
+        break;
+      case 'OBJECT_VIEW':
+        output.push('VIEW');
+        break;
+      case 'OBJECT_INDEX':
+        output.push('INDEX');
+        break;
+      case 'OBJECT_SEQUENCE':
+        output.push('SEQUENCE');
+        break;
+      case 'OBJECT_FUNCTION':
+        output.push('FUNCTION');
+        break;
+      case 'OBJECT_PROCEDURE':
+        output.push('PROCEDURE');
+        break;
+      case 'OBJECT_SCHEMA':
+        output.push('SCHEMA');
+        break;
+      case 'OBJECT_DATABASE':
+        output.push('DATABASE');
+        break;
+      default:
+        throw new Error(`Unsupported AlterOwnerStmt objectType: ${node.objectType}`);
+    }
+    
+    if (node.relation) {
+      output.push(this.visit(node.relation, context));
+    } else if (node.object) {
+      output.push(this.visit(node.object, context));
+    }
+    
+    output.push('OWNER TO');
+    
+    if (!node.newowner) {
+      throw new Error('AlterOwnerStmt requires newowner');
+    }
+    
+    output.push(this.visit(node.newowner, context));
+    
+    return output.join(' ');
+  }
 }
