@@ -798,7 +798,7 @@ export class Deparser implements DeparserVisitor {
     return this.formatter.format([
       this.visit(node.arg, context),
       '::',
-      this.TypeName(node.typeName as t.TypeName['TypeName'], context)
+      this.TypeName(node.typeName as t.TypeName, context)
     ]);
   }
 
@@ -928,7 +928,7 @@ export class Deparser implements DeparserVisitor {
 
     if (node.typeName) {
       // typeName is not wrapped in a node container
-      output.push(this.TypeName(node.typeName as t.TypeName['TypeName'], context));
+      output.push(this.TypeName(node.typeName as t.TypeName, context));
     }
 
     if (node.constraints) {
