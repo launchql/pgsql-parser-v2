@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('policy statements', () => {
   it('deparses CREATE POLICY with USING clause', () => {
@@ -22,6 +23,7 @@ describe('policy statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('CREATE POLICY user_active ON users FOR SELECT TO PUBLIC USING (is_active)');
+    expectAstMatchesParse('CREATE POLICY user_active ON users FOR SELECT TO PUBLIC USING (is_active)', ast);
   });
 
   it('deparses CREATE POLICY restrictive with check', () => {
@@ -50,6 +52,7 @@ describe('policy statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('CREATE POLICY update_owner ON users AS RESTRICTIVE FOR UPDATE TO admin WITH CHECK (owner_id = 1)');
+    expectAstMatchesParse('CREATE POLICY update_owner ON users AS RESTRICTIVE FOR UPDATE TO admin WITH CHECK (owner_id = 1)', ast);
   });
 
   it('deparses ALTER POLICY', () => {
@@ -71,5 +74,6 @@ describe('policy statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('ALTER POLICY user_active ON users TO manager USING (is_active)');
+    expectAstMatchesParse('ALTER POLICY user_active ON users TO manager USING (is_active)', ast);
   });
 });

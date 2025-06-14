@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('maintenance and utility statements', () => {
   it('deparses VACUUM FULL', () => {
@@ -17,6 +18,7 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe('VACUUM (FULL) users');
+    expectAstMatchesParse('VACUUM (FULL) users', ast);
   });
 
   it('deparses ANALYZE VERBOSE with columns', () => {
@@ -43,6 +45,7 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe('ANALYZE (VERBOSE) books(title, author)');
+    expectAstMatchesParse('ANALYZE (VERBOSE) books(title, author)', ast);
   });
 
   it('deparses EXPLAIN SELECT', () => {
@@ -70,6 +73,7 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe('EXPLAIN (ANALYZE) SELECT 1');
+    expectAstMatchesParse('EXPLAIN (ANALYZE) SELECT 1', ast);
   });
 
   it('deparses SET statement', () => {
@@ -86,6 +90,7 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe("SET application_name = 'myapp'");
+    expectAstMatchesParse("SET application_name = 'myapp'", ast);
   });
 
   it('deparses SHOW statement', () => {
@@ -100,6 +105,7 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe('SHOW search_path');
+    expectAstMatchesParse('SHOW search_path', ast);
   });
 
   it('deparses CREATE EXTENSION IF NOT EXISTS', () => {
@@ -115,5 +121,6 @@ describe('maintenance and utility statements', () => {
     } as any;
     const result = Deparser.deparse(ast);
     expect(result).toBe('CREATE EXTENSION IF NOT EXISTS hstore');
+    expectAstMatchesParse('CREATE EXTENSION IF NOT EXISTS hstore', ast);
   });
 });

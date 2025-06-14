@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('Deparser', () => {
   describe('basic SQL statements', () => {
@@ -32,6 +33,7 @@ describe('Deparser', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('SELECT 1');
+      expectAstMatchesParse('SELECT 1', ast);
     });
 
     it('should deparse SELECT with WHERE clause', () => {
@@ -109,6 +111,7 @@ describe('Deparser', () => {
       expect(result).toContain('SELECT *');
       expect(result).toContain('FROM users');
       expect(result).toContain('WHERE name = \'Alice\'');
+      expectAstMatchesParse("SELECT * FROM users WHERE name = 'Alice'", ast);
     });
 
     it('should deparse INSERT statement', () => {
@@ -165,6 +168,7 @@ describe('Deparser', () => {
       const result = Deparser.deparse(ast);
       expect(result).toContain('INSERT INTO items');
       expect(result).toContain('VALUES');
+      expectAstMatchesParse("INSERT INTO items(id, label) VALUES (1, 'thing')", ast);
     });
 
     it('should deparse UPDATE statement', () => {
@@ -231,6 +235,7 @@ describe('Deparser', () => {
       expect(result).toContain('UPDATE orders');
       expect(result).toContain('SET');
       expect(result).toContain('WHERE id = 5');
+      expectAstMatchesParse("UPDATE orders SET status = 'shipped' WHERE id = 5", ast);
     });
 
     it('should deparse DELETE statement', () => {
@@ -280,6 +285,7 @@ describe('Deparser', () => {
       const result = Deparser.deparse(ast);
       expect(result).toContain('DELETE FROM sessions');
       expect(result).toContain('WHERE expired = true');
+      expectAstMatchesParse('DELETE FROM sessions WHERE expired = true', ast);
     });
     it('should deparse JSON path query', () => {
       const ast = {
@@ -321,6 +327,7 @@ describe('Deparser', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toContain('SELECT jsonb_path_query(doc, \'$.store.book[*] ? (@.price < 10)\')');
+      expectAstMatchesParse("SELECT jsonb_path_query(doc, '$.store.book[*] ? (@.price < 10)') FROM books", ast);
     });
 
   });

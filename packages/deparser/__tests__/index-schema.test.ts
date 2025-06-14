@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('index and schema statements', () => {
   it('deparses CREATE INDEX', () => {
@@ -19,6 +20,7 @@ describe('index and schema statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('CREATE UNIQUE INDEX idx_users_name ON users USING BTREE (name)');
+    expectAstMatchesParse('CREATE UNIQUE INDEX idx_users_name ON users USING BTREE (name)', ast);
   });
 
   it('deparses CREATE SCHEMA IF NOT EXISTS', () => {
@@ -34,5 +36,6 @@ describe('index and schema statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('CREATE SCHEMA IF NOT EXISTS myschema');
+    expectAstMatchesParse('CREATE SCHEMA IF NOT EXISTS myschema', ast);
   });
 });

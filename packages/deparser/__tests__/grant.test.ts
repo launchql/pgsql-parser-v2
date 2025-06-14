@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('grant statements', () => {
   it('deparses simple GRANT', () => {
@@ -23,6 +24,7 @@ describe('grant statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('GRANT SELECT ON TABLE users TO bob');
+    expectAstMatchesParse('GRANT SELECT ON TABLE users TO bob', ast);
   });
 
   it('deparses REVOKE with grant option and cascade', () => {
@@ -48,6 +50,7 @@ describe('grant statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('REVOKE GRANT OPTION FOR INSERT ON TABLE users FROM PUBLIC CASCADE');
+    expectAstMatchesParse('REVOKE GRANT OPTION FOR INSERT ON TABLE users FROM PUBLIC CASCADE', ast);
   });
 
   it('deparses GRANT ROLE', () => {
@@ -69,6 +72,7 @@ describe('grant statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('GRANT APP_AUTHENTICATED TO app_user');
+    expectAstMatchesParse('GRANT APP_AUTHENTICATED TO app_user', ast);
   });
 
   it('deparses ALTER DEFAULT PRIVILEGES', () => {
@@ -110,5 +114,6 @@ describe('grant statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('ALTER DEFAULT PRIVILEGES IN SCHEMA myschema FOR ROLE app_user GRANT INSERT ON TABLES TO app_user');
+    expectAstMatchesParse('ALTER DEFAULT PRIVILEGES IN SCHEMA myschema FOR ROLE app_user GRANT INSERT ON TABLES TO app_user', ast);
   });
 });

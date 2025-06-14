@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 // import { parse } from '@pgsql/parser';  
 
 describe('CREATE TABLE statements', () => {
@@ -42,8 +43,8 @@ describe('CREATE TABLE statements', () => {
       };
 
       const result = Deparser.deparse(ast);
-      // expect(ast).toEqual(correctAst);
       expect(result).toBe('CREATE TABLE users (id int4, name text)');
+      expectAstMatchesParse('CREATE TABLE users (id int4, name text)', ast);
     });
 
     it('should deparse CREATE TABLE IF NOT EXISTS', () => {
@@ -77,6 +78,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE IF NOT EXISTS products (product_id int4)');
+      expectAstMatchesParse('CREATE TABLE IF NOT EXISTS products (product_id int4)', ast);
     });
 
     it('should deparse CREATE TEMPORARY TABLE', () => {
@@ -109,6 +111,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TEMPORARY TABLE temp_data (session_id text)');
+      expectAstMatchesParse('CREATE TEMPORARY TABLE temp_data (session_id text)', ast);
     });
 
     it('should deparse CREATE TABLE with schema', () => {
@@ -142,6 +145,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE public.users (id int4)');
+      expectAstMatchesParse('CREATE TABLE public.users (id int4)', ast);
     });
   });
 
@@ -184,6 +188,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE orders (order_id int4 PRIMARY KEY)');
+      expectAstMatchesParse('CREATE TABLE orders (order_id int4 PRIMARY KEY)', ast);
     });
 
     it('should deparse CREATE TABLE with NOT NULL constraint', () => {
@@ -217,6 +222,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE customers (email text NOT NULL)');
+      expectAstMatchesParse('CREATE TABLE customers (email text NOT NULL)', ast);
     });
 
     it('should deparse CREATE TABLE with CHECK constraint', () => {
@@ -274,6 +280,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE products (price numeric CHECK (price > 0))');
+      expectAstMatchesParse('CREATE TABLE products (price numeric CHECK (price > 0))', ast);
     });
 
     it('should deparse CREATE TABLE with UNIQUE constraint', () => {
@@ -313,6 +320,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE users (username text UNIQUE)');
+      expectAstMatchesParse('CREATE TABLE users (username text UNIQUE)', ast);
     });
   });
 
@@ -354,6 +362,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE settings (timeout int4 DEFAULT 30)');
+      expectAstMatchesParse('CREATE TABLE settings (timeout int4 DEFAULT 30)', ast);
     });
 
     it('should deparse CREATE TABLE with DEFAULT string', () => {
@@ -393,6 +402,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE users (status text DEFAULT \'active\')');
+      expectAstMatchesParse("CREATE TABLE users (status text DEFAULT 'active')", ast);
     });
 
     it('should deparse CREATE TABLE with DEFAULT boolean', () => {
@@ -432,6 +442,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE features (enabled bool DEFAULT true)');
+      expectAstMatchesParse('CREATE TABLE features (enabled bool DEFAULT true)', ast);
     });
   });
 
@@ -502,6 +513,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE mixed_types (id int4, name varchar(40), price numeric(10,2), created_at timestamp, is_active bool)');
+      expectAstMatchesParse('CREATE TABLE mixed_types (id int4, name varchar(40), price numeric(10,2), created_at timestamp, is_active bool)', ast);
     });
   });
 
@@ -551,6 +563,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE composite_key (user_id int4, role_id int4, PRIMARY KEY (user_id, role_id))');
+      expectAstMatchesParse('CREATE TABLE composite_key (user_id int4, role_id int4, PRIMARY KEY (user_id, role_id))', ast);
     });
 
     it('should deparse CREATE TABLE with table-level CHECK constraint', () => {
@@ -613,6 +626,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE products (price numeric, discounted_price numeric, CHECK (price > discounted_price))');
+      expectAstMatchesParse('CREATE TABLE products (price numeric, discounted_price numeric, CHECK (price > discounted_price))', ast);
     });
   });
 });

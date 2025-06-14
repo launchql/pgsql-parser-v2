@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('transaction and drop statements', () => {
   it('deparses BEGIN', () => {
@@ -7,6 +8,7 @@ describe('transaction and drop statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('BEGIN');
+    expectAstMatchesParse('BEGIN', ast);
   });
 
   it('deparses COMMIT AND CHAIN', () => {
@@ -15,6 +17,7 @@ describe('transaction and drop statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('COMMIT AND CHAIN');
+    expectAstMatchesParse('COMMIT AND CHAIN', ast);
   });
 
   it('deparses DROP TABLE', () => {
@@ -31,6 +34,7 @@ describe('transaction and drop statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('DROP TABLE users');
+    expectAstMatchesParse('DROP TABLE users', ast);
   });
 
   it('deparses DROP INDEX with options', () => {
@@ -49,6 +53,7 @@ describe('transaction and drop statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('DROP INDEX CONCURRENTLY IF EXISTS idx_users_name CASCADE');
+    expectAstMatchesParse('DROP INDEX CONCURRENTLY IF EXISTS idx_users_name CASCADE', ast);
   });
 
   it('deparses TRUNCATE with restart and cascade', () => {
@@ -65,5 +70,6 @@ describe('transaction and drop statements', () => {
     };
     const result = Deparser.deparse(ast);
     expect(result).toBe('TRUNCATE logs RESTART IDENTITY CASCADE');
+    expectAstMatchesParse('TRUNCATE logs RESTART IDENTITY CASCADE', ast);
   });
 });
