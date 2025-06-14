@@ -94,18 +94,16 @@ describe('grant statements', () => {
               }
             ],
             action: {
-              GrantStmt: {
-                is_grant: true,
-                targtype: 'ACL_TARGET_DEFAULTS',
-                objtype: 'OBJECT_TABLE',
-                privileges: [
-                  { AccessPriv: { priv_name: 'insert' } }
-                ],
-                grantees: [
-                  { RoleSpec: { roletype: 'ROLESPEC_CSTRING', rolename: 'app_user' } }
-                ],
-                behavior: 'DROP_RESTRICT'
-              }
+              is_grant: true,
+              targtype: 'ACL_TARGET_DEFAULTS',
+              objtype: 'OBJECT_TABLE',
+              privileges: [
+                { AccessPriv: { priv_name: 'insert' } }
+              ],
+              grantees: [
+                { RoleSpec: { roletype: 'ROLESPEC_CSTRING', rolename: 'app_user' } }
+              ],
+              behavior: 'DROP_RESTRICT'
             }
           }
         }

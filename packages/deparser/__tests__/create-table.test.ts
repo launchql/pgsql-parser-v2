@@ -246,13 +246,17 @@ describe('CREATE TABLE statements', () => {
                   ColumnDef: {
                     colname: 'price',
                     typeName: {
-                      names: [{ String: { sval: 'numeric' } }],
+                      names: [
+                        { String: { sval: 'pg_catalog' } },
+                        { String: { sval: 'numeric' } }
+                      ],
                       typemod: -1
                     },
                     constraints: [
                       {
                         Constraint: {
                           contype: 'CONSTR_CHECK',
+                          initially_valid: true,
                           raw_expr: {
                             A_Expr: {
                               kind: 'AEXPR_OP',
@@ -264,9 +268,7 @@ describe('CREATE TABLE statements', () => {
                               },
                               rexpr: {
                                 A_Const: {
-                                  ival: {
-                                    ival: 0
-                                  }
+                                  ival: { ival: 0 }
                                 }
                               }
                             }
@@ -349,13 +351,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'int4' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        ival: {
-                          ival: 30
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              ival: { ival: 30 }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],
@@ -389,13 +396,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'text' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        sval: {
-                          sval: 'active'
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              sval: { sval: 'active' }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],
@@ -429,13 +441,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'bool' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        boolval: {
-                          boolval: true
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              boolval: { boolval: true }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],

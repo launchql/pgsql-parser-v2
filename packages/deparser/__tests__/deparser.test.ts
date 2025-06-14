@@ -298,6 +298,7 @@ describe('Deparser', () => {
                     val: {
                       FuncCall: {
                         funcname: [{ String: { str: 'jsonb_path_query' } }],
+                        funcformat: 'COERCE_EXPLICIT_CALL',
                         args: [
                           {
                             ColumnRef: {
