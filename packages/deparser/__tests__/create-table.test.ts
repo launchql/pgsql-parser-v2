@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 // import { parse } from '@pgsql/parser';  
 
 describe('CREATE TABLE statements', () => {
@@ -10,11 +11,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -44,8 +43,8 @@ describe('CREATE TABLE statements', () => {
       };
 
       const result = Deparser.deparse(ast);
-      // expect(ast).toEqual(correctAst);
       expect(result).toBe('CREATE TABLE users (id int4, name text)');
+      expectAstMatchesParse('CREATE TABLE users (id int4, name text)', ast);
     });
 
     it('should deparse CREATE TABLE IF NOT EXISTS', () => {
@@ -54,11 +53,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -81,6 +78,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE IF NOT EXISTS products (product_id int4)');
+      expectAstMatchesParse('CREATE TABLE IF NOT EXISTS products (product_id int4)', ast);
     });
 
     it('should deparse CREATE TEMPORARY TABLE', () => {
@@ -89,11 +87,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'temp_data',
-                  inh: true,
-                  relpersistence: 't'
-                }
+                relname: 'temp_data',
+                inh: true,
+                relpersistence: 't'
               },
               tableElts: [
                 {
@@ -115,6 +111,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TEMPORARY TABLE temp_data (session_id text)');
+      expectAstMatchesParse('CREATE TEMPORARY TABLE temp_data (session_id text)', ast);
     });
 
     it('should deparse CREATE TABLE with schema', () => {
@@ -123,12 +120,10 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  schemaname: 'public',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                schemaname: 'public',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -150,6 +145,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE public.users (id int4)');
+      expectAstMatchesParse('CREATE TABLE public.users (id int4)', ast);
     });
   });
 
@@ -160,11 +156,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'orders',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'orders',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -194,6 +188,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE orders (order_id int4 PRIMARY KEY)');
+      expectAstMatchesParse('CREATE TABLE orders (order_id int4 PRIMARY KEY)', ast);
     });
 
     it('should deparse CREATE TABLE with NOT NULL constraint', () => {
@@ -202,11 +197,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'customers',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'customers',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -216,7 +209,13 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'text' } }],
                       typemod: -1
                     },
-                    is_not_null: true
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_NOTNULL'
+                        }
+                      }
+                    ]
                   }
                 }
               ],
@@ -229,6 +228,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE customers (email text NOT NULL)');
+      expectAstMatchesParse('CREATE TABLE customers (email text NOT NULL)', ast);
     });
 
     it('should deparse CREATE TABLE with CHECK constraint', () => {
@@ -237,24 +237,26 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
                   ColumnDef: {
                     colname: 'price',
                     typeName: {
-                      names: [{ String: { sval: 'numeric' } }],
+                      names: [
+                        { String: { sval: 'pg_catalog' } },
+                        { String: { sval: 'numeric' } }
+                      ],
                       typemod: -1
                     },
                     constraints: [
                       {
                         Constraint: {
                           contype: 'CONSTR_CHECK',
+                          initially_valid: true,
                           raw_expr: {
                             A_Expr: {
                               kind: 'AEXPR_OP',
@@ -266,9 +268,7 @@ describe('CREATE TABLE statements', () => {
                               },
                               rexpr: {
                                 A_Const: {
-                                  ival: {
-                                    ival: 0
-                                  }
+                                  ival: {}
                                 }
                               }
                             }
@@ -288,6 +288,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE products (price numeric CHECK (price > 0))');
+      expectAstMatchesParse('CREATE TABLE products (price numeric CHECK (price > 0))', ast);
     });
 
     it('should deparse CREATE TABLE with UNIQUE constraint', () => {
@@ -296,11 +297,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -329,6 +328,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE users (username text UNIQUE)');
+      expectAstMatchesParse('CREATE TABLE users (username text UNIQUE)', ast);
     });
   });
 
@@ -339,11 +339,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'settings',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'settings',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -353,13 +351,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'int4' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        ival: {
-                          ival: 30
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              ival: { ival: 30 }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],
@@ -372,6 +375,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE settings (timeout int4 DEFAULT 30)');
+      expectAstMatchesParse('CREATE TABLE settings (timeout int4 DEFAULT 30)', ast);
     });
 
     it('should deparse CREATE TABLE with DEFAULT string', () => {
@@ -380,11 +384,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -394,13 +396,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'text' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        sval: {
-                          sval: 'active'
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              sval: { sval: 'active' }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],
@@ -413,6 +420,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE users (status text DEFAULT \'active\')');
+      expectAstMatchesParse("CREATE TABLE users (status text DEFAULT 'active')", ast);
     });
 
     it('should deparse CREATE TABLE with DEFAULT boolean', () => {
@@ -421,11 +429,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'features',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'features',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -435,13 +441,18 @@ describe('CREATE TABLE statements', () => {
                       names: [{ String: { sval: 'bool' } }],
                       typemod: -1
                     },
-                    raw_default: {
-                      A_Const: {
-                        boolval: {
-                          boolval: true
+                    constraints: [
+                      {
+                        Constraint: {
+                          contype: 'CONSTR_DEFAULT',
+                          raw_expr: {
+                            A_Const: {
+                              boolval: { boolval: true }
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 }
               ],
@@ -454,6 +465,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE features (enabled bool DEFAULT true)');
+      expectAstMatchesParse('CREATE TABLE features (enabled bool DEFAULT true)', ast);
     });
   });
 
@@ -464,11 +476,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'mixed_types',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'mixed_types',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -526,6 +536,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE mixed_types (id int4, name varchar(40), price numeric(10,2), created_at timestamp, is_active bool)');
+      expectAstMatchesParse('CREATE TABLE mixed_types (id int4, name varchar(40), price numeric(10,2), created_at timestamp, is_active bool)', ast);
     });
   });
 
@@ -536,11 +547,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'composite_key',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'composite_key',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -577,6 +586,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE composite_key (user_id int4, role_id int4, PRIMARY KEY (user_id, role_id))');
+      expectAstMatchesParse('CREATE TABLE composite_key (user_id int4, role_id int4, PRIMARY KEY (user_id, role_id))', ast);
     });
 
     it('should deparse CREATE TABLE with table-level CHECK constraint', () => {
@@ -585,11 +595,9 @@ describe('CREATE TABLE statements', () => {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -641,6 +649,7 @@ describe('CREATE TABLE statements', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('CREATE TABLE products (price numeric, discounted_price numeric, CHECK (price > discounted_price))');
+      expectAstMatchesParse('CREATE TABLE products (price numeric, discounted_price numeric, CHECK (price > discounted_price))', ast);
     });
   });
 });

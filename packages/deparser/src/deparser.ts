@@ -4,6 +4,7 @@ import { DeparserContext, DeparserVisitor } from './visitors/base';
 import { QuoteUtils } from './utils/quote-utils';
 import { ListUtils } from './utils/list-utils';
 import typeNameProperties from './type-name-properties.json';
+import rangeVarProperties from './range-var-properties.json';
 import * as t from '@pgsql/utils/wrapped';
 export interface DeparserOptions {
   newline?: string;
@@ -14,9 +15,13 @@ export class Deparser implements DeparserVisitor {
   private formatter: SqlFormatter;
   private tree: Node[];
 
-  constructor(tree: Node | Node[], opts: DeparserOptions = {}) {
+  constructor(tree: Node | Node[] | { version: number; stmts: Node[] }, opts: DeparserOptions = {}) {
     this.formatter = new SqlFormatter(opts.newline, opts.tab);
-    this.tree = Array.isArray(tree) ? tree : [tree];
+    if (!Array.isArray(tree) && (tree as any)?.version !== undefined && Array.isArray((tree as any).stmts)) {
+      this.tree = (tree as any).stmts as Node[];
+    } else {
+      this.tree = Array.isArray(tree) ? tree : [tree as Node];
+    }
   }
 
   static deparse(query: Node | Node[], opts: DeparserOptions = {}): string {
@@ -64,6 +69,21 @@ export class Deparser implements DeparserVisitor {
       }
     }
 
+    // Unwrap RangeVar properties when they appear wrapped
+    const rangeProps = (rangeVarProperties as any)[nodeType];
+    if (rangeProps) {
+      for (const propName of rangeProps) {
+        if (nodeData[propName]) {
+          const value = nodeData[propName];
+          if (Array.isArray(value)) {
+            nodeData[propName] = value.map(v => (v && (v as any).RangeVar) ? v.RangeVar : v);
+          } else if (value.RangeVar) {
+            nodeData[propName] = value.RangeVar;
+          }
+        }
+      }
+    }
+
     const methodName = nodeType as keyof this;
     if (typeof this[methodName] === 'function') {
       return (this[methodName] as any)(nodeData, context);
@@ -73,12 +93,39 @@ export class Deparser implements DeparserVisitor {
   }
 
   getNodeType(node: Node): string {
+    if (this.isRangeVar(node)) {
+      return 'RangeVar';
+    }
+
+    if (
+      node &&
+      typeof node === 'object' &&
+      'stmt' in (node as any)
+    ) {
+      return 'RawStmt';
+    }
+
     return Object.keys(node)[0];
   }
 
   getNodeData(node: Node): any {
     const type = this.getNodeType(node);
+    if (type === 'RangeVar' && !(node as any).RangeVar) {
+      return node;
+    }
+    if (type === 'RawStmt' && !(node as any).RawStmt) {
+      return node;
+    }
     return (node as any)[type];
+  }
+
+  private isRangeVar(node: any): boolean {
+    return (
+      node &&
+      typeof node === 'object' &&
+      'relname' in node &&
+      typeof (node as any).relname === 'string'
+    );
   }
 
   RawStmt(node: t.RawStmt['RawStmt'], context: DeparserContext): string {
@@ -581,6 +628,9 @@ export class Deparser implements DeparserVisitor {
       return node.ival.Integer.ival.toString();
     } else if (typeof node.ival === 'object' && 'ival' in node.ival) {
       return node.ival.ival.toString();
+    } else if (node.ival && typeof node.ival === 'object' && Object.keys(node.ival).length === 0) {
+      // libpg_query represents integer 0 as an empty object
+      return '0';
     } else if (node.fval?.Float?.fval !== undefined) {
       return node.fval.Float.fval;
     } else if (node.sval?.String?.sval !== undefined) {
@@ -589,6 +639,9 @@ export class Deparser implements DeparserVisitor {
       return QuoteUtils.escape(node.sval.sval as string);
     } else if (node.boolval?.Boolean?.boolval !== undefined) {
       return node.boolval.Boolean.boolval ? 'true' : 'false';
+    } else if (typeof node.boolval === 'object' && 'boolval' in node.boolval) {
+      // handle wrapped boolean without the Boolean tag
+      return node.boolval.boolval ? 'true' : 'false';
     } else if (node.bsval?.BitString?.bsval !== undefined) {
       return node.bsval.BitString.bsval;
     } else if (node.isnull) {
@@ -609,7 +662,7 @@ export class Deparser implements DeparserVisitor {
     }).join('.');
   }
 
-  TypeName(node: t.TypeName['TypeName'], context: DeparserContext): string {
+  TypeName(node: t.TypeName, context: DeparserContext): string {
     if (!node.names) {
       return '';
     }
@@ -624,7 +677,21 @@ export class Deparser implements DeparserVisitor {
     const catalog = names[0];
     const type = names[1];
 
-    const args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
+    let args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
+
+    if (!args && node.typemod != null && node.typemod !== -1) {
+      const lastName = names[names.length - 1];
+
+      if (lastName === 'numeric') {
+        const tm = node.typemod - 4;
+        const precision = tm >> 16;
+        const scale = tm & 0xffff;
+        args = `${precision},${scale}`;
+      } else if (lastName === 'varchar' || lastName === 'bpchar' || lastName === 'char') {
+        const length = node.typemod - 64;
+        args = `${length}`;
+      }
+    }
 
     const mods = (name: string, size: string | null) => {
       if (size != null) {
@@ -668,22 +735,22 @@ export class Deparser implements DeparserVisitor {
     return output.join(' ');
   }
 
-  RangeVar(node: t.RangeVar['RangeVar'], context: DeparserContext): string {
-    const output: string[] = [];
+  RangeVar(node: t.RangeVar, context: DeparserContext): string {
+    let relation = '';
 
     if (node.schemaname) {
-      output.push(QuoteUtils.quote(node.schemaname));
-      output.push('.');
+      relation += QuoteUtils.quote(node.schemaname) + '.';
     }
+    relation += QuoteUtils.quote(node.relname);
 
-    output.push(QuoteUtils.quote(node.relname));
+    const parts: string[] = [relation];
 
     if (node.alias) {
       const aliasStr = this.deparse(node.alias, context);
-      output.push(aliasStr);
+      parts.push(aliasStr);
     }
 
-    return output.join(' ');
+    return parts.join(' ');
   }
 
   formatTypeMods(typmods: t.Node[], context: DeparserContext): string | null {
@@ -795,7 +862,7 @@ export class Deparser implements DeparserVisitor {
     return this.formatter.format([
       this.visit(node.arg, context),
       '::',
-      this.visit(node.typeName, context)
+      this.TypeName(node.typeName as t.TypeName, context)
     ]);
   }
 
@@ -863,8 +930,8 @@ export class Deparser implements DeparserVisitor {
     return output.join(' ');
   }
 
-  String(node: t.String['String'], context: DeparserContext): string { 
-    return node.sval || ''; 
+  String(node: t.String['String'], context: DeparserContext): string {
+    return node.sval ?? (node as any).str ?? '';
   }
   
   Integer(node: t.Integer['Integer'], context: DeparserContext): string { 
@@ -890,10 +957,17 @@ export class Deparser implements DeparserVisitor {
   CreateStmt(node: t.CreateStmt['CreateStmt'], context: DeparserContext): string {
     const output: string[] = ['CREATE'];
 
+    const relpersistence = (node.relation as any)?.relpersistence;
+    if (relpersistence === 't') {
+      output.push('TEMPORARY');
+    } else if (relpersistence === 'u') {
+      output.push('UNLOGGED');
+    }
+
+    output.push('TABLE');
+
     if (node.if_not_exists) {
-      output.push('TABLE IF NOT EXISTS');
-    } else {
-      output.push('TABLE');
+      output.push('IF NOT EXISTS');
     }
 
     output.push(this.visit(node.relation, context));
@@ -924,7 +998,8 @@ export class Deparser implements DeparserVisitor {
     }
 
     if (node.typeName) {
-      output.push(this.visit(node.typeName, context));
+      // typeName is not wrapped in a node container
+      output.push(this.TypeName(node.typeName as t.TypeName, context));
     }
 
     if (node.constraints) {
@@ -971,9 +1046,21 @@ export class Deparser implements DeparserVisitor {
         break;
       case 'CONSTR_PRIMARY':
         output.push('PRIMARY KEY');
+        if (node.keys) {
+          const keys = ListUtils.unwrapList(node.keys).map(k => this.visit(k, context));
+          if (keys.length) {
+            output.push(this.formatter.parens(keys.join(', ')));
+          }
+        }
         break;
       case 'CONSTR_UNIQUE':
         output.push('UNIQUE');
+        if (node.keys) {
+          const keys = ListUtils.unwrapList(node.keys).map(k => this.visit(k, context));
+          if (keys.length) {
+            output.push(this.formatter.parens(keys.join(', ')));
+          }
+        }
         break;
       case 'CONSTR_FOREIGN':
         output.push('REFERENCES');
@@ -1171,13 +1258,633 @@ export class Deparser implements DeparserVisitor {
   FromExpr(node: t.FromExpr['FromExpr'], context: DeparserContext): string {
     const fromlist = ListUtils.unwrapList(node.fromlist);
     const fromStrs = fromlist.map(item => this.visit(item, context));
-    
+
     let result = fromStrs.join(', ');
-    
+
     if (node.quals) {
       result += ` WHERE ${this.visit(node.quals, context)}`;
     }
-    
+
     return result;
+  }
+
+  TransactionStmt(node: t.TransactionStmt['TransactionStmt'], context: DeparserContext): string {
+    switch (node.kind) {
+      case 'TRANS_STMT_BEGIN':
+        return 'BEGIN';
+      case 'TRANS_STMT_START':
+        return 'START TRANSACTION';
+      case 'TRANS_STMT_COMMIT':
+        return node.chain ? 'COMMIT AND CHAIN' : 'COMMIT';
+      case 'TRANS_STMT_ROLLBACK':
+        return node.chain ? 'ROLLBACK AND CHAIN' : 'ROLLBACK';
+      case 'TRANS_STMT_SAVEPOINT':
+        return `SAVEPOINT ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_RELEASE':
+        return `RELEASE ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_ROLLBACK_TO':
+        return `ROLLBACK TO SAVEPOINT ${QuoteUtils.quote(node.savepoint_name!)}`;
+      case 'TRANS_STMT_PREPARE':
+        return `PREPARE TRANSACTION '${node.gid}'`;
+      case 'TRANS_STMT_COMMIT_PREPARED':
+        return `COMMIT PREPARED '${node.gid}'`;
+      case 'TRANS_STMT_ROLLBACK_PREPARED':
+        return `ROLLBACK PREPARED '${node.gid}'`;
+      default:
+        return '';
+    }
+  }
+
+  DropStmt(node: t.DropStmt['DropStmt'], context: DeparserContext): string {
+    const typeMap: Record<string, string> = {
+      OBJECT_TABLE: 'TABLE',
+      OBJECT_INDEX: 'INDEX',
+      OBJECT_SCHEMA: 'SCHEMA',
+      OBJECT_VIEW: 'VIEW',
+      OBJECT_MATVIEW: 'MATERIALIZED VIEW',
+      OBJECT_SEQUENCE: 'SEQUENCE'
+    };
+
+    const objects = ListUtils.unwrapList(node.objects).map(list => {
+      const names = ListUtils.unwrapList(list).map(n => this.visit(n, context));
+      return names.join('.');
+    });
+
+    const parts: string[] = ['DROP'];
+    parts.push(typeMap[node.removeType as string] || node.removeType!);
+
+    if (node.concurrent) {
+      parts.push('CONCURRENTLY');
+    }
+
+    if (node.missing_ok) {
+      parts.push('IF EXISTS');
+    }
+
+    parts.push(objects.join(', '));
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  TruncateStmt(node: t.TruncateStmt['TruncateStmt'], context: DeparserContext): string {
+    const rels = ListUtils.unwrapList(node.relations).map(r => this.visit(r, context)).join(', ');
+    const parts: string[] = ['TRUNCATE', rels];
+
+    if (node.restart_seqs) {
+      parts.push('RESTART IDENTITY');
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  IndexElem(node: t.IndexElem['IndexElem'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    if (node.name) {
+      parts.push(QuoteUtils.quote(node.name));
+    } else if (node.expr) {
+      parts.push(this.visit(node.expr, context));
+    }
+
+    if (node.collation) {
+      const coll = ListUtils.unwrapList(node.collation)
+        .map(c => this.visit(c, context))
+        .join('.');
+      if (coll) {
+        parts.push(`COLLATE ${coll}`);
+      }
+    }
+
+    if (node.opclass) {
+      const opclass = ListUtils.unwrapList(node.opclass)
+        .map(o => this.visit(o, context))
+        .join('.');
+      if (opclass) {
+        parts.push(opclass);
+      }
+    }
+
+    switch (node.ordering) {
+      case 'SORTBY_ASC':
+        parts.push('ASC');
+        break;
+      case 'SORTBY_DESC':
+        parts.push('DESC');
+        break;
+    }
+
+    switch (node.nulls_ordering) {
+      case 'SORTBY_NULLS_FIRST':
+        parts.push('NULLS FIRST');
+        break;
+      case 'SORTBY_NULLS_LAST':
+        parts.push('NULLS LAST');
+        break;
+    }
+
+    return parts.join(' ');
+  }
+
+  IndexStmt(node: t.IndexStmt['IndexStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE'];
+
+    if (node.unique) {
+      parts.push('UNIQUE');
+    }
+
+    parts.push('INDEX');
+
+    if (node.concurrent) {
+      parts.push('CONCURRENTLY');
+    }
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.idxname) {
+      parts.push(QuoteUtils.quote(node.idxname));
+    }
+
+    parts.push('ON');
+    parts.push(this.visit(node.relation, context));
+
+    if (node.accessMethod) {
+      parts.push('USING');
+      parts.push(node.accessMethod.toUpperCase());
+    }
+
+    const params = ListUtils.unwrapList(node.indexParams);
+    if (params.length) {
+      const elems = params.map(p => this.visit(p, context));
+      parts.push(this.formatter.parens(elems.join(', ')));
+    }
+
+    const include = ListUtils.unwrapList(node.indexIncludingParams);
+    if (include.length) {
+      const elems = include.map(p => this.visit(p, context));
+      parts.push(`INCLUDE ${this.formatter.parens(elems.join(', '))}`);
+    }
+
+    if (node.nulls_not_distinct) {
+      parts.push('NULLS NOT DISTINCT');
+    }
+
+    if (node.options) {
+      const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+      if (opts.length) {
+        parts.push(`WITH (${opts.join(', ')})`);
+      }
+    }
+
+    if (node.tableSpace) {
+      parts.push('TABLESPACE');
+      parts.push(QuoteUtils.quote(node.tableSpace));
+    }
+
+    if (node.whereClause) {
+      parts.push('WHERE');
+      parts.push(this.visit(node.whereClause, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  CreateSchemaStmt(node: t.CreateSchemaStmt['CreateSchemaStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE SCHEMA'];
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.schemaname) {
+      parts.push(QuoteUtils.quote(node.schemaname));
+    }
+
+    if (node.authrole) {
+      parts.push('AUTHORIZATION');
+      parts.push(this.visit(node.authrole, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  RoleSpec(node: t.RoleSpec['RoleSpec'], context: DeparserContext): string {
+    switch (node.roletype) {
+      case 'ROLESPEC_CSTRING':
+        return QuoteUtils.quote(node.rolename!);
+      case 'ROLESPEC_CURRENT_USER':
+        return 'CURRENT_USER';
+      case 'ROLESPEC_CURRENT_ROLE':
+        return 'CURRENT_ROLE';
+      case 'ROLESPEC_SESSION_USER':
+        return 'SESSION_USER';
+      case 'ROLESPEC_PUBLIC':
+        return 'PUBLIC';
+      default:
+        return QuoteUtils.quote(node.rolename!);
+    }
+  }
+
+  AccessPriv(node: t.AccessPriv['AccessPriv'], context: DeparserContext): string {
+    const name = node.priv_name ? node.priv_name.toUpperCase() : '';
+    const cols = ListUtils.unwrapList(node.cols).map(c => this.visit(c, context));
+    if (cols.length) {
+      return `${name}${this.formatter.parens(cols.join(', '))}`.trim();
+    }
+    return name;
+  }
+
+  GrantStmt(node: t.GrantStmt['GrantStmt'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    if (node.is_grant) {
+      parts.push('GRANT');
+    } else {
+      parts.push('REVOKE');
+      if (node.grant_option) {
+        parts.push('GRANT OPTION FOR');
+      }
+    }
+
+    const privs = ListUtils.unwrapList(node.privileges).map(p => this.visit(p, context));
+    if (privs.length) {
+      parts.push(privs.join(', '));
+    } else {
+      parts.push('ALL');
+    }
+
+    parts.push('ON');
+
+    const typeMap: Record<string, string> = {
+      OBJECT_TABLE: 'TABLE',
+      OBJECT_SEQUENCE: 'SEQUENCE',
+      OBJECT_DATABASE: 'DATABASE',
+      OBJECT_SCHEMA: 'SCHEMA',
+      OBJECT_FUNCTION: 'FUNCTION',
+      OBJECT_LANGUAGE: 'LANGUAGE',
+      OBJECT_LARGEOBJECT: 'LARGE OBJECT',
+      OBJECT_VIEW: 'VIEW',
+      OBJECT_MATVIEW: 'MATERIALIZED VIEW',
+      OBJECT_TYPE: 'TYPE',
+      OBJECT_TABLESPACE: 'TABLESPACE'
+    };
+
+    let objType = typeMap[node.objtype as string];
+    if (!objType) {
+      objType = (node.objtype || '').replace('OBJECT_', '');
+    }
+
+    if (node.targtype === 'ACL_TARGET_ALL_IN_SCHEMA') {
+      parts.push(`ALL ${objType}s IN SCHEMA`);
+    } else if (node.targtype === 'ACL_TARGET_DEFAULTS') {
+      parts.push(objType + 'S');
+    } else {
+      parts.push(objType);
+    }
+
+    const objs = ListUtils.unwrapList(node.objects).map(o => this.visit(o, context));
+    if (objs.length) {
+      parts.push(objs.join(', '));
+    }
+
+    if (node.is_grant) {
+      parts.push('TO');
+    } else {
+      parts.push('FROM');
+    }
+    const grantees = ListUtils.unwrapList(node.grantees).map(g => this.visit(g, context));
+    if (grantees.length) {
+      parts.push(grantees.join(', '));
+    }
+
+    if (node.is_grant && node.grant_option) {
+      parts.push('WITH GRANT OPTION');
+    }
+
+    if (node.grantor) {
+      parts.push('GRANTED BY');
+      parts.push(this.visit(node.grantor, context));
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  GrantRoleStmt(node: t.GrantRoleStmt['GrantRoleStmt'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    const optAdmin = ListUtils.unwrapList(node.opt).some(opt => {
+      if (this.getNodeType(opt) === 'DefElem') {
+        const d = this.getNodeData(opt);
+        return d.defname === 'admin' && d.arg?.Boolean?.boolval;
+      }
+      return false;
+    });
+
+    if (node.is_grant) {
+      parts.push('GRANT');
+    } else {
+      parts.push('REVOKE');
+      if (optAdmin) {
+        parts.push('ADMIN OPTION FOR');
+      }
+    }
+
+    const granted = ListUtils.unwrapList(node.granted_roles).map(r => this.visit(r, context));
+    if (granted.length) {
+      parts.push(granted.join(', '));
+    }
+
+    if (node.is_grant) {
+      parts.push('TO');
+    } else {
+      parts.push('FROM');
+    }
+
+    const grantees = ListUtils.unwrapList(node.grantee_roles).map(r => this.visit(r, context));
+    if (grantees.length) {
+      parts.push(grantees.join(', '));
+    }
+
+    if (node.is_grant && optAdmin) {
+      parts.push('WITH ADMIN OPTION');
+    }
+
+    if (node.grantor) {
+      parts.push('GRANTED BY');
+      parts.push(this.visit(node.grantor, context));
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  AlterDefaultPrivilegesStmt(node: t.AlterDefaultPrivilegesStmt['AlterDefaultPrivilegesStmt'], context: DeparserContext): string {
+    const parts: string[] = ['ALTER DEFAULT PRIVILEGES'];
+
+    const options = ListUtils.unwrapList(node.options);
+    for (const opt of options) {
+      if (this.getNodeType(opt) === 'DefElem') {
+        const d = this.getNodeData(opt);
+        const names = ListUtils.unwrapList(d.arg).map(a => this.visit(a, context)).join(', ');
+        if (d.defname === 'schemas') {
+          parts.push('IN SCHEMA');
+          parts.push(names);
+        } else if (d.defname === 'roles') {
+          parts.push('FOR ROLE');
+          parts.push(names);
+        }
+      }
+    }
+
+    if (node.action) {
+      const type = this.getNodeType(node.action as any);
+      const actionNode =
+        type === 'GrantStmt'
+          ? (node.action as any)
+          : { GrantStmt: node.action as unknown as t.GrantStmt['GrantStmt'] };
+      parts.push(this.visit(actionNode, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  CreatePolicyStmt(node: t.CreatePolicyStmt['CreatePolicyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE POLICY'];
+
+    if (node.policy_name) {
+      parts.push(QuoteUtils.quote(node.policy_name));
+    }
+
+    if (node.table) {
+      parts.push('ON');
+      parts.push(this.visit(node.table, context));
+    }
+
+    if (node.permissive === false || node.permissive === undefined) {
+      parts.push('AS RESTRICTIVE');
+    }
+
+    if (node.cmd_name && node.cmd_name !== 'all') {
+      parts.push('FOR');
+      parts.push(node.cmd_name.toUpperCase());
+    }
+
+    parts.push('TO');
+    const roles = ListUtils.unwrapList(node.roles).map(r => this.visit(r, context));
+    if (roles.length) {
+      parts.push(roles.join(', '));
+    } else {
+      parts.push('PUBLIC');
+    }
+
+    if (node.qual) {
+      parts.push('USING');
+      parts.push(this.formatter.parens(this.visit(node.qual, context)));
+    }
+
+    if (node.with_check) {
+      parts.push('WITH CHECK');
+      parts.push(this.formatter.parens(this.visit(node.with_check, context)));
+    }
+
+    return parts.join(' ');
+  }
+
+  AlterPolicyStmt(node: t.AlterPolicyStmt['AlterPolicyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['ALTER POLICY'];
+
+    if (node.policy_name) {
+      parts.push(QuoteUtils.quote(node.policy_name));
+    }
+
+    if (node.table) {
+      parts.push('ON');
+      parts.push(this.visit(node.table, context));
+    }
+
+    const roles = ListUtils.unwrapList(node.roles).map(r => this.visit(r, context));
+    if (roles.length) {
+      parts.push('TO');
+      parts.push(roles.join(', '));
+    }
+
+    if (node.qual) {
+      parts.push('USING');
+      parts.push(this.formatter.parens(this.visit(node.qual, context)));
+    }
+
+    if (node.with_check) {
+      parts.push('WITH CHECK');
+      parts.push(this.formatter.parens(this.visit(node.with_check, context)));
+    }
+
+    return parts.join(' ');
+  }
+
+  DefElem(node: t.DefElem['DefElem'], context: DeparserContext): string {
+    let name = node.defname?.toUpperCase() || '';
+    if (node.defnamespace) {
+      name = `${node.defnamespace.toUpperCase()}.${name}`;
+    }
+
+    if (node.arg) {
+      const value = this.visit(node.arg, context);
+      return `${name} ${value}`.trim();
+    }
+
+    return name;
+  }
+
+  VariableSetStmt(node: t.VariableSetStmt['VariableSetStmt'], context: DeparserContext): string {
+    switch (node.kind) {
+      case 'VAR_SET_VALUE':
+        const vals = ListUtils.unwrapList(node.args).map(a => this.visit(a, context)).join(', ');
+        return `SET ${node.is_local ? 'LOCAL ' : ''}${node.name} = ${vals}`;
+      case 'VAR_SET_DEFAULT':
+        return `SET ${node.name} TO DEFAULT`;
+      case 'VAR_SET_CURRENT':
+        return `SET ${node.name} FROM CURRENT`;
+      case 'VAR_RESET':
+        return `RESET ${node.name}`;
+      case 'VAR_RESET_ALL':
+        return 'RESET ALL';
+      default:
+        const args = ListUtils.unwrapList(node.args).map(a => this.visit(a, context)).join(', ');
+        return `SET ${node.name} ${args}`.trim();
+    }
+  }
+
+  VariableShowStmt(node: t.VariableShowStmt['VariableShowStmt'], context: DeparserContext): string {
+    return `SHOW ${node.name}`;
+  }
+
+  CreateExtensionStmt(node: t.CreateExtensionStmt['CreateExtensionStmt'], context: DeparserContext): string {
+    const parts: string[] = ['CREATE EXTENSION'];
+
+    if (node.if_not_exists) {
+      parts.push('IF NOT EXISTS');
+    }
+
+    if (node.extname) {
+      parts.push(QuoteUtils.quote(node.extname));
+    }
+
+    if (node.options) {
+      const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+      if (opts.length) {
+        parts.push('WITH');
+        parts.push(opts.join(' '));
+      }
+    }
+
+    return parts.join(' ');
+  }
+
+  ExplainStmt(node: t.ExplainStmt['ExplainStmt'], context: DeparserContext): string {
+    const parts: string[] = ['EXPLAIN'];
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    if (node.query) {
+      parts.push(this.visit(node.query, context));
+    }
+
+    return parts.join(' ');
+  }
+
+  VacuumStmt(node: t.VacuumStmt['VacuumStmt'], context: DeparserContext): string {
+    const parts: string[] = [node.is_vacuumcmd ? 'VACUUM' : 'ANALYZE'];
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    const rels = ListUtils.unwrapList(node.rels).map(r => {
+      const rel = this.getNodeData(r);
+      let relStr = this.visit(rel.relation, context);
+      const cols = ListUtils.unwrapList(rel.va_cols).map(c => this.visit(c, context));
+      if (cols.length) {
+        relStr += this.formatter.parens(cols.join(', '));
+      }
+      return relStr;
+    });
+
+    if (rels.length) {
+      parts.push(rels.join(', '));
+    }
+
+    return parts.join(' ');
+  }
+
+  LockStmt(node: t.LockStmt['LockStmt'], context: DeparserContext): string {
+    const rels = ListUtils.unwrapList(node.relations).map(r => this.visit(r, context)).join(', ');
+    const parts: string[] = ['LOCK TABLE', rels];
+
+    const modeMap: Record<number, string> = {
+      1: 'ACCESS SHARE',
+      2: 'ROW SHARE',
+      3: 'ROW EXCLUSIVE',
+      4: 'SHARE UPDATE EXCLUSIVE',
+      5: 'SHARE',
+      6: 'SHARE ROW EXCLUSIVE',
+      7: 'EXCLUSIVE',
+      8: 'ACCESS EXCLUSIVE'
+    };
+
+    if (node.mode && node.mode !== 8) {
+      const m = modeMap[node.mode];
+      if (m) {
+        parts.push('IN', m, 'MODE');
+      }
+    }
+
+    if (node.nowait) {
+      parts.push('NOWAIT');
+    }
+
+    return parts.join(' ');
+  }
+
+  CopyStmt(node: t.CopyStmt['CopyStmt'], context: DeparserContext): string {
+    const parts: string[] = ['COPY'];
+
+    if (node.query) {
+      parts.push(this.formatter.parens(this.visit(node.query, context)));
+    } else if (node.relation) {
+      parts.push(this.visit(node.relation, context));
+    }
+
+    parts.push(node.is_from ? 'FROM' : 'TO');
+
+    if (node.filename) {
+      parts.push(QuoteUtils.escape(node.filename));
+    }
+
+    const opts = ListUtils.unwrapList(node.options).map(o => this.visit(o, context));
+    if (opts.length) {
+      parts.push(this.formatter.parens(opts.join(', ')));
+    }
+
+    return parts.join(' ');
   }
 }

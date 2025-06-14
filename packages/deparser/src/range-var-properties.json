@@ -1,0 +1,9 @@
+{
+  "CreateStmt": ["relation"],
+  "IndexStmt": ["relation"],
+  "VacuumRelation": ["relation"],
+  "TruncateStmt": ["relations"],
+  "GrantStmt": ["objects"],
+  "CreatePolicyStmt": ["table"],
+  "AlterPolicyStmt": ["table"]
+}

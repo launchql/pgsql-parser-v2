@@ -1,4 +1,5 @@
 import { Deparser } from '../src/deparser';
+import { expectAstMatchesParse } from "./ast-helpers";
 
 describe('Deparser', () => {
   describe('basic SQL statements', () => {
@@ -32,6 +33,7 @@ describe('Deparser', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toBe('SELECT 1');
+      expectAstMatchesParse('SELECT 1', ast);
     });
 
     it('should deparse SELECT with WHERE clause', () => {
@@ -58,12 +60,10 @@ describe('Deparser', () => {
               ],
               fromClause: [
                 {
-                  RangeVar: {
-                    relname: "users",
-                    inh: true,
-                    relpersistence: "p",
-                    location: 14
-                  }
+                  relname: "users",
+                  inh: true,
+                  relpersistence: "p",
+                  location: 14
                 }
               ],
               whereClause: {
@@ -111,6 +111,7 @@ describe('Deparser', () => {
       expect(result).toContain('SELECT *');
       expect(result).toContain('FROM users');
       expect(result).toContain('WHERE name = \'Alice\'');
+      expectAstMatchesParse("SELECT * FROM users WHERE name = 'Alice'", ast);
     });
 
     it('should deparse INSERT statement', () => {
@@ -119,9 +120,7 @@ describe('Deparser', () => {
           stmt: {
             InsertStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'items'
-                }
+                relname: 'items'
               },
               cols: [
                 {
@@ -169,6 +168,7 @@ describe('Deparser', () => {
       const result = Deparser.deparse(ast);
       expect(result).toContain('INSERT INTO items');
       expect(result).toContain('VALUES');
+      expectAstMatchesParse("INSERT INTO items(id, label) VALUES (1, 'thing')", ast);
     });
 
     it('should deparse UPDATE statement', () => {
@@ -177,9 +177,7 @@ describe('Deparser', () => {
           stmt: {
             UpdateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'orders'
-                }
+                relname: 'orders'
               },
               targetList: [
                 {
@@ -237,6 +235,7 @@ describe('Deparser', () => {
       expect(result).toContain('UPDATE orders');
       expect(result).toContain('SET');
       expect(result).toContain('WHERE id = 5');
+      expectAstMatchesParse("UPDATE orders SET status = 'shipped' WHERE id = 5", ast);
     });
 
     it('should deparse DELETE statement', () => {
@@ -245,9 +244,7 @@ describe('Deparser', () => {
           stmt: {
             DeleteStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'sessions'
-                }
+                relname: 'sessions'
               },
               whereClause: {
                 A_Expr: {
@@ -288,6 +285,7 @@ describe('Deparser', () => {
       const result = Deparser.deparse(ast);
       expect(result).toContain('DELETE FROM sessions');
       expect(result).toContain('WHERE expired = true');
+      expectAstMatchesParse('DELETE FROM sessions WHERE expired = true', ast);
     });
     it('should deparse JSON path query', () => {
       const ast = {
@@ -300,6 +298,7 @@ describe('Deparser', () => {
                     val: {
                       FuncCall: {
                         funcname: [{ String: { str: 'jsonb_path_query' } }],
+                        funcformat: 'COERCE_EXPLICIT_CALL',
                         args: [
                           {
                             ColumnRef: {
@@ -319,9 +318,7 @@ describe('Deparser', () => {
               ],
               fromClause: [
                 {
-                  RangeVar: {
-                    relname: 'books'
-                  }
+                  relname: 'books'
                 }
               ]
             }
@@ -331,6 +328,7 @@ describe('Deparser', () => {
 
       const result = Deparser.deparse(ast);
       expect(result).toContain('SELECT jsonb_path_query(doc, \'$.store.book[*] ? (@.price < 10)\')');
+      expectAstMatchesParse("SELECT jsonb_path_query(doc, '$.store.book[*] ? (@.price < 10)') FROM books", ast);
     });
 
   });
