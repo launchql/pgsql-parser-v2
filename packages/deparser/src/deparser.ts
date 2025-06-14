@@ -15,9 +15,13 @@ export class Deparser implements DeparserVisitor {
   private formatter: SqlFormatter;
   private tree: Node[];
 
-  constructor(tree: Node | Node[], opts: DeparserOptions = {}) {
+  constructor(tree: Node | Node[] | { version: number; stmts: Node[] }, opts: DeparserOptions = {}) {
     this.formatter = new SqlFormatter(opts.newline, opts.tab);
-    this.tree = Array.isArray(tree) ? tree : [tree];
+    if (!Array.isArray(tree) && (tree as any)?.version !== undefined && Array.isArray((tree as any).stmts)) {
+      this.tree = (tree as any).stmts as Node[];
+    } else {
+      this.tree = Array.isArray(tree) ? tree : [tree as Node];
+    }
   }
 
   static deparse(query: Node | Node[], opts: DeparserOptions = {}): string {
