@@ -796,10 +796,23 @@ export class Deparser implements DeparserVisitor {
   }
 
   A_Indices(node: t.A_Indices['A_Indices'], context: DeparserContext): string {
-    if (node.lidx) {
-      return `[${this.visit(node.lidx, context)}:${this.visit(node.uidx, context)}]`;
+    const output: string[] = [];
+
+    if (node.is_slice) {
+      if (node.lidx) {
+        output.push(this.visit(node.lidx, context));
+      }
+      output.push(':');
+      if (node.uidx) {
+        output.push(this.visit(node.uidx, context));
+      }
+    } else {
+      if (node.uidx) {
+        output.push(this.visit(node.uidx, context));
+      }
     }
-    return `[${this.visit(node.uidx, context)}]`;
+
+    return `[${output.join('')}]`;
   }
 
   A_Indirection(node: t.A_Indirection['A_Indirection'], context: DeparserContext): string {
@@ -1331,5 +1344,352 @@ export class Deparser implements DeparserVisitor {
 
   VariableShowStmt(node: t.VariableShowStmt['VariableShowStmt'], context: DeparserContext): string {
     return `SHOW ${node.name}`;
+  }
+
+  CreateSchemaStmt(node: t.CreateSchemaStmt['CreateSchemaStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE SCHEMA'];
+
+    if (node.if_not_exists) {
+      output.push('IF NOT EXISTS');
+    }
+
+    if (node.schemaname) {
+      output.push(QuoteUtils.quote(node.schemaname));
+    }
+
+    if (node.authrole) {
+      output.push('AUTHORIZATION');
+      output.push(this.visit(node.authrole, context));
+    }
+
+    if (node.schemaElts && node.schemaElts.length > 0) {
+      const elements = ListUtils.unwrapList(node.schemaElts)
+        .map(element => this.visit(element, context))
+        .join('; ');
+      output.push(elements);
+    }
+
+    return output.join(' ');
+  }
+
+  RoleSpec(node: t.RoleSpec['RoleSpec'], context: DeparserContext): string {
+    if (node.rolename) {
+      return node.rolename;
+    }
+    return '';
+  }
+
+  DropStmt(node: t.DropStmt['DropStmt'], context: DeparserContext): string {
+    const output: string[] = ['DROP'];
+
+    if (node.removeType) {
+      switch (node.removeType) {
+        case 'OBJECT_TABLE':
+          output.push('TABLE');
+          break;
+        case 'OBJECT_VIEW':
+          output.push('VIEW');
+          break;
+        case 'OBJECT_INDEX':
+          output.push('INDEX');
+          break;
+        case 'OBJECT_SEQUENCE':
+          output.push('SEQUENCE');
+          break;
+        case 'OBJECT_SCHEMA':
+          output.push('SCHEMA');
+          break;
+        case 'OBJECT_FUNCTION':
+          output.push('FUNCTION');
+          break;
+        case 'OBJECT_PROCEDURE':
+          output.push('PROCEDURE');
+          break;
+        case 'OBJECT_DATABASE':
+          output.push('DATABASE');
+          break;
+        case 'OBJECT_EXTENSION':
+          output.push('EXTENSION');
+          break;
+        case 'OBJECT_TYPE':
+          output.push('TYPE');
+          break;
+        case 'OBJECT_DOMAIN':
+          output.push('DOMAIN');
+          break;
+        case 'OBJECT_TRIGGER':
+          output.push('TRIGGER');
+          break;
+        case 'OBJECT_RULE':
+          output.push('RULE');
+          break;
+        default:
+          throw new Error(`Unsupported DROP object type: ${node.removeType}`);
+      }
+    }
+
+    if (node.concurrent) {
+      output.push('CONCURRENTLY');
+    }
+
+    if (node.missing_ok) {
+      output.push('IF EXISTS');
+    }
+
+    if (node.objects && node.objects.length > 0) {
+      const objects = node.objects.map(objList => {
+        if (Array.isArray(objList)) {
+          return objList.map(obj => this.visit(obj, context)).join('.');
+        }
+        return this.visit(objList, context);
+      }).join(', ');
+      output.push(objects);
+    }
+
+    if (node.behavior) {
+      switch (node.behavior) {
+        case 'DROP_CASCADE':
+          output.push('CASCADE');
+          break;
+        case 'DROP_RESTRICT':
+          output.push('RESTRICT');
+          break;
+        default:
+          throw new Error(`Unsupported DROP behavior: ${node.behavior}`);
+      }
+    }
+
+    return output.join(' ');
+  }
+
+  TruncateStmt(node: t.TruncateStmt['TruncateStmt'], context: DeparserContext): string {
+    const output: string[] = ['TRUNCATE'];
+
+    if (node.relations && node.relations.length > 0) {
+      const relations = node.relations
+        .map(relation => this.visit(relation, context))
+        .join(', ');
+      output.push(relations);
+    }
+
+    if (node.restart_seqs) {
+      output.push('RESTART IDENTITY');
+    }
+
+    if (node.behavior) {
+      switch (node.behavior) {
+        case 'DROP_CASCADE':
+          output.push('CASCADE');
+          break;
+        case 'DROP_RESTRICT':
+          output.push('RESTRICT');
+          break;
+      }
+    }
+
+    return output.join(' ');
+  }
+
+  ReturnStmt(node: t.ReturnStmt['ReturnStmt'], context: DeparserContext): string {
+    const output: string[] = ['RETURN'];
+
+    if (node.returnval) {
+      const returnValue = this.visit(node.returnval, context);
+      output.push(returnValue);
+    }
+
+    return output.join(' ');
+  }
+
+  PLAssignStmt(node: t.PLAssignStmt['PLAssignStmt'], context: DeparserContext): string {
+    const output: string[] = [];
+
+    if (node.name) {
+      let nameWithIndirection = QuoteUtils.quote(node.name);
+
+      if (node.indirection && node.indirection.length > 0) {
+        const indirectionStr = node.indirection
+          .map(ind => this.visit(ind, context))
+          .join('');
+        nameWithIndirection += indirectionStr;
+      }
+
+      output.push(nameWithIndirection);
+    }
+
+    output.push(':=');
+
+    if (node.val) {
+      const valueStr = this.visit(node.val, context);
+      output.push(valueStr);
+    }
+
+    return output.join(' ');
+  }
+
+  CopyStmt(node: t.CopyStmt['CopyStmt'], context: DeparserContext): string {
+    const output: string[] = ['COPY'];
+
+    if (node.relation) {
+      const relationStr = this.visit(node.relation, context);
+      output.push(relationStr);
+    } else if (node.query) {
+      const queryStr = this.visit(node.query, context);
+      output.push(`(${queryStr})`);
+    }
+
+    if (node.attlist && node.attlist.length > 0) {
+      const columnList = ListUtils.unwrapList(node.attlist)
+        .map(col => this.visit(col, context))
+        .join(', ');
+      output.push(`(${columnList})`);
+    }
+
+    if (node.is_from) {
+      output.push('FROM');
+    } else {
+      output.push('TO');
+    }
+
+    if (node.is_program) {
+      output.push('PROGRAM');
+    }
+
+    if (node.filename) {
+      output.push(`'${node.filename}'`);
+    } else {
+      output.push('STDIN');
+    }
+
+    if (node.options && node.options.length > 0) {
+      output.push('WITH');
+      const optionsStr = ListUtils.unwrapList(node.options)
+        .map(opt => this.visit(opt, context))
+        .join(', ');
+      output.push(`(${optionsStr})`);
+    }
+
+    if (node.whereClause) {
+      output.push('WHERE');
+      const whereStr = this.visit(node.whereClause, context);
+      output.push(whereStr);
+    }
+
+    return output.join(' ');
+  }
+
+  AlterTableStmt(node: t.AlterTableStmt['AlterTableStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER'];
+
+    if (node.objtype) {
+      switch (node.objtype) {
+        case 'OBJECT_TABLE':
+          output.push('TABLE');
+          break;
+        case 'OBJECT_INDEX':
+          output.push('INDEX');
+          break;
+        case 'OBJECT_SEQUENCE':
+          output.push('SEQUENCE');
+          break;
+        case 'OBJECT_VIEW':
+          output.push('VIEW');
+          break;
+        case 'OBJECT_MATVIEW':
+          output.push('MATERIALIZED VIEW');
+          break;
+        case 'OBJECT_FOREIGN_TABLE':
+          output.push('FOREIGN TABLE');
+          break;
+        default:
+          output.push('TABLE');
+      }
+    } else {
+      output.push('TABLE');
+    }
+
+    if (node.missing_ok) {
+      output.push('IF EXISTS');
+    }
+
+    if (node.relation) {
+      const relationStr = this.visit(node.relation, context);
+      output.push(relationStr);
+    }
+
+    if (node.cmds && node.cmds.length > 0) {
+      const commandsStr = ListUtils.unwrapList(node.cmds)
+        .map(cmd => this.visit(cmd, context))
+        .join(', ');
+      output.push(commandsStr);
+    }
+
+    return output.join(' ');
+  }
+
+  AlterTableCmd(node: t.AlterTableCmd['AlterTableCmd'], context: DeparserContext): string {
+    const output: string[] = [];
+
+    if (node.subtype) {
+      switch (node.subtype) {
+        case 'AT_AddColumn':
+          output.push('ADD COLUMN');
+          if (node.def) {
+            const columnDef = this.visit(node.def, context);
+            output.push(columnDef);
+          }
+          break;
+        case 'AT_DropColumn':
+          output.push('DROP COLUMN');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          if (node.behavior === 'DROP_CASCADE') {
+            output.push('CASCADE');
+          } else if (node.behavior === 'DROP_RESTRICT') {
+            output.push('RESTRICT');
+          }
+          break;
+        case 'AT_AlterColumnType':
+          output.push('ALTER COLUMN');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          output.push('TYPE');
+          if (node.def) {
+            const typeDef = this.visit(node.def, context);
+            output.push(typeDef);
+          }
+          break;
+        case 'AT_SetTableSpace':
+          output.push('SET TABLESPACE');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          break;
+        case 'AT_AddConstraint':
+          output.push('ADD');
+          if (node.def) {
+            const constraintDef = this.visit(node.def, context);
+            output.push(constraintDef);
+          }
+          break;
+        case 'AT_DropConstraint':
+          output.push('DROP CONSTRAINT');
+          if (node.name) {
+            output.push(QuoteUtils.quote(node.name));
+          }
+          if (node.behavior === 'DROP_CASCADE') {
+            output.push('CASCADE');
+          } else if (node.behavior === 'DROP_RESTRICT') {
+            output.push('RESTRICT');
+          }
+          break;
+        default:
+          throw new Error(`Unsupported AlterTableCmd subtype: ${node.subtype}`);
+      }
+    }
+
+    return output.join(' ');
   }
 }
