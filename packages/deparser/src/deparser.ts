@@ -2656,4 +2656,110 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  CheckPointStmt(node: t.CheckPointStmt['CheckPointStmt'], context: DeparserContext): string {
+    return 'CHECKPOINT';
+  }
+
+  LoadStmt(node: t.LoadStmt['LoadStmt'], context: DeparserContext): string {
+    if (!node.filename) {
+      throw new Error('LoadStmt requires filename');
+    }
+    return `LOAD '${node.filename}'`;
+  }
+
+  DiscardStmt(node: t.DiscardStmt['DiscardStmt'], context: DeparserContext): string {
+    switch (node.target) {
+      case 'DISCARD_ALL':
+        return 'DISCARD ALL';
+      case 'DISCARD_PLANS':
+        return 'DISCARD PLANS';
+      case 'DISCARD_SEQUENCES':
+        return 'DISCARD SEQUENCES';
+      case 'DISCARD_TEMP':
+        return 'DISCARD TEMP';
+      default:
+        throw new Error(`Unsupported DiscardStmt target: ${node.target}`);
+    }
+  }
+
+  CommentStmt(node: t.CommentStmt['CommentStmt'], context: DeparserContext): string {
+    const output: string[] = ['COMMENT ON'];
+    
+    if (node.objtype) {
+      switch (node.objtype) {
+        case 'OBJECT_TABLE':
+          output.push('TABLE');
+          break;
+        case 'OBJECT_COLUMN':
+          output.push('COLUMN');
+          break;
+        case 'OBJECT_INDEX':
+          output.push('INDEX');
+          break;
+        case 'OBJECT_FUNCTION':
+          output.push('FUNCTION');
+          break;
+        case 'OBJECT_VIEW':
+          output.push('VIEW');
+          break;
+        case 'OBJECT_SCHEMA':
+          output.push('SCHEMA');
+          break;
+        case 'OBJECT_DATABASE':
+          output.push('DATABASE');
+          break;
+        default:
+          output.push(node.objtype.replace('OBJECT_', ''));
+      }
+    }
+    
+    if (node.object) {
+      output.push(this.visit(node.object, context));
+    }
+    
+    output.push('IS');
+    
+    if (node.comment === null) {
+      output.push('NULL');
+    } else if (node.comment) {
+      output.push(`'${node.comment}'`);
+    }
+    
+    return output.join(' ');
+  }
+
+  LockStmt(node: t.LockStmt['LockStmt'], context: DeparserContext): string {
+    const output: string[] = ['LOCK'];
+    
+    if (node.relations && node.relations.length > 0) {
+      const relations = ListUtils.unwrapList(node.relations)
+        .map(rel => this.visit(rel, context))
+        .join(', ');
+      output.push(relations);
+    }
+    
+    if (node.mode !== undefined) {
+      const lockModes = [
+        'ACCESS SHARE',
+        'ROW SHARE', 
+        'ROW EXCLUSIVE',
+        'SHARE UPDATE EXCLUSIVE',
+        'SHARE',
+        'SHARE ROW EXCLUSIVE',
+        'EXCLUSIVE',
+        'ACCESS EXCLUSIVE'
+      ];
+      
+      if (node.mode >= 0 && node.mode < lockModes.length) {
+        output.push('IN', lockModes[node.mode], 'MODE');
+      }
+    }
+    
+    if (node.nowait) {
+      output.push('NOWAIT');
+    }
+    
+    return output.join(' ');
+  }
 }
