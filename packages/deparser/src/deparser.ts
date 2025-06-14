@@ -2201,4 +2201,239 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  CreateEnumStmt(node: t.CreateEnumStmt['CreateEnumStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'TYPE'];
+    
+    if (node.typeName) {
+      const typeName = ListUtils.unwrapList(node.typeName)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(typeName);
+    }
+    
+    output.push('AS', 'ENUM');
+    
+    if (node.vals && node.vals.length > 0) {
+      const values = ListUtils.unwrapList(node.vals)
+        .map(val => `'${this.visit(val, context)}'`)
+        .join(', ');
+      output.push(`(${values})`);
+    } else {
+      output.push('()');
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateDomainStmt(node: t.CreateDomainStmt['CreateDomainStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'DOMAIN'];
+    
+    if (node.domainname) {
+      const domainName = ListUtils.unwrapList(node.domainname)
+        .map(name => this.visit(name, context))
+        .join('.');
+      output.push(domainName);
+    }
+    
+    if (node.typeName) {
+      output.push('AS');
+      output.push(this.TypeName(node.typeName, context));
+    }
+    
+    if (node.collClause) {
+      output.push(this.visit(node.collClause, context));
+    }
+    
+    if (node.constraints) {
+      const constraints = ListUtils.unwrapList(node.constraints)
+        .map(constraint => this.visit(constraint, context))
+        .join(' ');
+      if (constraints) {
+        output.push(constraints);
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateRoleStmt(node: t.CreateRoleStmt['CreateRoleStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE'];
+    
+    if (node.stmt_type === 'ROLESTMT_ROLE') {
+      output.push('ROLE');
+    } else if (node.stmt_type === 'ROLESTMT_USER') {
+      output.push('USER');
+    } else if (node.stmt_type === 'ROLESTMT_GROUP') {
+      output.push('GROUP');
+    } else {
+      output.push('ROLE');
+    }
+    
+    if (node.role) {
+      output.push(node.role);
+    }
+    
+    if (node.options) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      if (options) {
+        output.push(options);
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  DefElem(node: t.DefElem['DefElem'], context: DeparserContext): string {
+    const output: string[] = [];
+    
+    if (node.defname) {
+      const defName = node.defname.toUpperCase();
+      
+      if (node.arg) {
+        const argValue = this.visit(node.arg, context);
+        if (argValue === 'true') {
+          output.push(defName);
+        } else if (argValue === 'false') {
+          output.push(`NO${defName}`);
+        } else {
+          output.push(`${defName} ${argValue}`);
+        }
+      } else {
+        output.push(defName);
+      }
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateTableSpaceStmt(node: t.CreateTableSpaceStmt['CreateTableSpaceStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'TABLESPACE'];
+    
+    if (node.tablespacename) {
+      output.push(node.tablespacename);
+    }
+    
+    if (node.owner) {
+      output.push('OWNER');
+      output.push(this.visit(node.owner, context));
+    }
+    
+    if (node.location) {
+      output.push('LOCATION');
+      output.push(`'${node.location}'`);
+    }
+    
+    if (node.options && node.options.length > 0) {
+      output.push('WITH');
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(', ');
+      output.push(`(${options})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  DropTableSpaceStmt(node: t.DropTableSpaceStmt['DropTableSpaceStmt'], context: DeparserContext): string {
+    const output: string[] = ['DROP', 'TABLESPACE'];
+    
+    if (node.missing_ok) {
+      output.push('IF', 'EXISTS');
+    }
+    
+    if (node.tablespacename) {
+      output.push(node.tablespacename);
+    }
+    
+    return output.join(' ');
+  }
+
+  AlterTableSpaceOptionsStmt(node: t.AlterTableSpaceOptionsStmt['AlterTableSpaceOptionsStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'TABLESPACE'];
+    
+    if (node.tablespacename) {
+      output.push(node.tablespacename);
+    }
+    
+    if (node.isReset) {
+      output.push('RESET');
+    } else {
+      output.push('SET');
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(', ');
+      output.push(`(${options})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateExtensionStmt(node: t.CreateExtensionStmt['CreateExtensionStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'EXTENSION'];
+    
+    if (node.if_not_exists) {
+      output.push('IF', 'NOT', 'EXISTS');
+    }
+    
+    if (node.extname) {
+      output.push(node.extname);
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push(options);
+    }
+    
+    return output.join(' ');
+  }
+
+  AlterExtensionStmt(node: t.AlterExtensionStmt['AlterExtensionStmt'], context: DeparserContext): string {
+    const output: string[] = ['ALTER', 'EXTENSION'];
+    
+    if (node.extname) {
+      output.push(node.extname);
+    }
+    
+    if (node.options && node.options.length > 0) {
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push(options);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateFdwStmt(node: t.CreateFdwStmt['CreateFdwStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'FOREIGN', 'DATA', 'WRAPPER'];
+    
+    if (node.fdwname) {
+      output.push(node.fdwname);
+    }
+    
+    if (node.func_options && node.func_options.length > 0) {
+      const funcOptions = ListUtils.unwrapList(node.func_options)
+        .map(option => this.visit(option, context))
+        .join(' ');
+      output.push(funcOptions);
+    }
+    
+    if (node.options && node.options.length > 0) {
+      output.push('OPTIONS');
+      const options = ListUtils.unwrapList(node.options)
+        .map(option => this.visit(option, context))
+        .join(', ');
+      output.push(`(${options})`);
+    }
+    
+    return output.join(' ');
+  }
 }
