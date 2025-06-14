@@ -2762,4 +2762,158 @@ export class Deparser implements DeparserVisitor {
     
     return output.join(' ');
   }
+
+  CreatePolicyStmt(node: t.CreatePolicyStmt['CreatePolicyStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'POLICY'];
+    
+    if (node.policy_name) {
+      output.push(QuoteUtils.quote(node.policy_name));
+    }
+    
+    output.push('ON');
+    
+    if (node.table) {
+      output.push(this.visit(node.table, context));
+    }
+    
+    if (node.cmd_name) {
+      output.push('FOR', node.cmd_name);
+    }
+    
+    if (node.roles && node.roles.length > 0) {
+      output.push('TO');
+      const roles = ListUtils.unwrapList(node.roles).map(role => this.visit(role, context));
+      output.push(roles.join(', '));
+    }
+    
+    if (node.qual) {
+      output.push('USING');
+      output.push(`(${this.visit(node.qual, context)})`);
+    }
+    
+    if (node.with_check) {
+      output.push('WITH CHECK');
+      output.push(`(${this.visit(node.with_check, context)})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateUserMappingStmt(node: t.CreateUserMappingStmt['CreateUserMappingStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'USER', 'MAPPING'];
+    
+    if (node.if_not_exists) {
+      output.splice(2, 0, 'IF NOT EXISTS');
+    }
+    
+    output.push('FOR');
+    
+    if (node.user) {
+      output.push(this.visit(node.user, context));
+    } else {
+      output.push('CURRENT_USER');
+    }
+    
+    output.push('SERVER');
+    
+    if (node.servername) {
+      output.push(QuoteUtils.quote(node.servername));
+    }
+    
+    if (node.options && node.options.length > 0) {
+      output.push('OPTIONS');
+      const options = ListUtils.unwrapList(node.options).map(opt => this.visit(opt, context));
+      output.push(`(${options.join(', ')})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateStatsStmt(node: t.CreateStatsStmt['CreateStatsStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'STATISTICS'];
+    
+    if (node.if_not_exists) {
+      output.splice(2, 0, 'IF NOT EXISTS');
+    }
+    
+    if (node.defnames && node.defnames.length > 0) {
+      const names = ListUtils.unwrapList(node.defnames).map(name => this.visit(name, context));
+      output.push(names.join('.'));
+    }
+    
+    if (node.stat_types && node.stat_types.length > 0) {
+      output.push('(');
+      const types = ListUtils.unwrapList(node.stat_types).map(type => this.visit(type, context));
+      output.push(types.join(', '));
+      output.push(')');
+    }
+    
+    output.push('ON');
+    
+    if (node.exprs && node.exprs.length > 0) {
+      const exprs = ListUtils.unwrapList(node.exprs).map(expr => this.visit(expr, context));
+      output.push(exprs.join(', '));
+    }
+    
+    if (node.relations && node.relations.length > 0) {
+      output.push('FROM');
+      const relations = ListUtils.unwrapList(node.relations).map(rel => this.visit(rel, context));
+      output.push(relations.join(', '));
+    }
+    
+    return output.join(' ');
+  }
+
+  CreatePublicationStmt(node: t.CreatePublicationStmt['CreatePublicationStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'PUBLICATION'];
+    
+    if (node.pubname) {
+      output.push(QuoteUtils.quote(node.pubname));
+    }
+    
+    if (node.pubobjects && node.pubobjects.length > 0) {
+      output.push('FOR', 'TABLE');
+      const tables = ListUtils.unwrapList(node.pubobjects).map(table => this.visit(table, context));
+      output.push(tables.join(', '));
+    } else if (node.for_all_tables) {
+      output.push('FOR', 'ALL', 'TABLES');
+    }
+    
+    if (node.options && node.options.length > 0) {
+      output.push('WITH');
+      const options = ListUtils.unwrapList(node.options).map(opt => this.visit(opt, context));
+      output.push(`(${options.join(', ')})`);
+    }
+    
+    return output.join(' ');
+  }
+
+  CreateSubscriptionStmt(node: t.CreateSubscriptionStmt['CreateSubscriptionStmt'], context: DeparserContext): string {
+    const output: string[] = ['CREATE', 'SUBSCRIPTION'];
+    
+    if (node.subname) {
+      output.push(QuoteUtils.quote(node.subname));
+    }
+    
+    output.push('CONNECTION');
+    
+    if (node.conninfo) {
+      output.push(`'${node.conninfo}'`);
+    }
+    
+    output.push('PUBLICATION');
+    
+    if (node.publication && node.publication.length > 0) {
+      const publications = ListUtils.unwrapList(node.publication).map(pub => this.visit(pub, context));
+      output.push(publications.join(', '));
+    }
+    
+    if (node.options && node.options.length > 0) {
+      output.push('WITH');
+      const options = ListUtils.unwrapList(node.options).map(opt => this.visit(opt, context));
+      output.push(`(${options.join(', ')})`);
+    }
+    
+    return output.join(' ');
+  }
 }
