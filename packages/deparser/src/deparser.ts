@@ -627,7 +627,21 @@ export class Deparser implements DeparserVisitor {
     const catalog = names[0];
     const type = names[1];
 
-    const args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
+    let args = node.typmods ? this.formatTypeMods(node.typmods, context) : null;
+
+    if (!args && node.typemod != null && node.typemod !== -1) {
+      const lastName = names[names.length - 1];
+
+      if (lastName === 'numeric') {
+        const tm = node.typemod - 4;
+        const precision = tm >> 16;
+        const scale = tm & 0xffff;
+        args = `${precision},${scale}`;
+      } else if (lastName === 'varchar' || lastName === 'bpchar' || lastName === 'char') {
+        const length = node.typemod - 64;
+        args = `${length}`;
+      }
+    }
 
     const mods = (name: string, size: string | null) => {
       if (size != null) {
@@ -672,21 +686,21 @@ export class Deparser implements DeparserVisitor {
   }
 
   RangeVar(node: t.RangeVar['RangeVar'], context: DeparserContext): string {
-    const output: string[] = [];
+    let relation = '';
 
     if (node.schemaname) {
-      output.push(QuoteUtils.quote(node.schemaname));
-      output.push('.');
+      relation += QuoteUtils.quote(node.schemaname) + '.';
     }
+    relation += QuoteUtils.quote(node.relname);
 
-    output.push(QuoteUtils.quote(node.relname));
+    const parts: string[] = [relation];
 
     if (node.alias) {
       const aliasStr = this.deparse(node.alias, context);
-      output.push(aliasStr);
+      parts.push(aliasStr);
     }
 
-    return output.join(' ');
+    return parts.join(' ');
   }
 
   formatTypeMods(typmods: t.Node[], context: DeparserContext): string | null {
@@ -893,10 +907,17 @@ export class Deparser implements DeparserVisitor {
   CreateStmt(node: t.CreateStmt['CreateStmt'], context: DeparserContext): string {
     const output: string[] = ['CREATE'];
 
+    const relpersistence = node.relation?.RangeVar?.relpersistence || (node.relation as any)?.relpersistence;
+    if (relpersistence === 't') {
+      output.push('TEMPORARY');
+    } else if (relpersistence === 'u') {
+      output.push('UNLOGGED');
+    }
+
+    output.push('TABLE');
+
     if (node.if_not_exists) {
-      output.push('TABLE IF NOT EXISTS');
-    } else {
-      output.push('TABLE');
+      output.push('IF NOT EXISTS');
     }
 
     output.push(this.visit(node.relation, context));
@@ -975,9 +996,21 @@ export class Deparser implements DeparserVisitor {
         break;
       case 'CONSTR_PRIMARY':
         output.push('PRIMARY KEY');
+        if (node.keys) {
+          const keys = ListUtils.unwrapList(node.keys).map(k => this.visit(k, context));
+          if (keys.length) {
+            output.push(this.formatter.parens(keys.join(', ')));
+          }
+        }
         break;
       case 'CONSTR_UNIQUE':
         output.push('UNIQUE');
+        if (node.keys) {
+          const keys = ListUtils.unwrapList(node.keys).map(k => this.visit(k, context));
+          if (keys.length) {
+            output.push(this.formatter.parens(keys.join(', ')));
+          }
+        }
         break;
       case 'CONSTR_FOREIGN':
         output.push('REFERENCES');
