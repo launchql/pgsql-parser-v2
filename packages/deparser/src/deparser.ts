@@ -1634,9 +1634,11 @@ export class Deparser implements DeparserVisitor {
     }
 
     if (node.action) {
-      const actionNode = this.getNodeType(node.action)
-        ? node.action
-        : { GrantStmt: node.action as unknown as t.GrantStmt['GrantStmt'] };
+      const type = this.getNodeType(node.action as any);
+      const actionNode =
+        type === 'GrantStmt'
+          ? (node.action as any)
+          : { GrantStmt: node.action as unknown as t.GrantStmt['GrantStmt'] };
       parts.push(this.visit(actionNode, context));
     }
 
