@@ -16,5 +16,7 @@ try {
 export function expectAstMatchesParse(sql: string, ast: any) {
   if (!parseFn) return;
   const parsed = parseFn(sql);
-  expect(cleanTree(ast)).toEqual(cleanTree(parsed));
+  // parser results include a root object with version info
+  const stmt = parsed?.stmts?.[0]?.stmt ?? parsed;
+  expect(cleanTree(ast)).toEqual(cleanTree(stmt));
 }
