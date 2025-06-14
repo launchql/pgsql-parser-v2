@@ -37,7 +37,6 @@ export function expectAstMatchesParse(sql: string, ast: any) {
     ? parsed[0]?.RawStmt?.stmt ?? parsed[0]
     : parsed?.stmts?.[0]?.stmt ?? parsed;
   const inputStmt = ast?.RawStmt?.stmt ?? ast;
-  expect(cleanTree(unwrapRangeVars(inputStmt))).toEqual(
-    cleanTree(unwrapRangeVars(parsedStmt))
-  );
+  const normalize = (node: any) => unwrapRangeVars(cleanTree(node));
+  expect(normalize(inputStmt)).toEqual(normalize(parsedStmt));
 }
