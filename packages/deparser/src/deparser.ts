@@ -589,6 +589,9 @@ export class Deparser implements DeparserVisitor {
       return QuoteUtils.escape(node.sval.sval as string);
     } else if (node.boolval?.Boolean?.boolval !== undefined) {
       return node.boolval.Boolean.boolval ? 'true' : 'false';
+    } else if (typeof node.boolval === 'object' && 'boolval' in node.boolval) {
+      // handle wrapped boolean without the Boolean tag
+      return node.boolval.boolval ? 'true' : 'false';
     } else if (node.bsval?.BitString?.bsval !== undefined) {
       return node.bsval.BitString.bsval;
     } else if (node.isnull) {
@@ -1330,7 +1333,7 @@ export class Deparser implements DeparserVisitor {
     parts.push('ON');
     parts.push(this.visit(node.relation, context));
 
-    if (node.accessMethod && node.accessMethod.toLowerCase() !== 'btree') {
+    if (node.accessMethod) {
       parts.push('USING');
       parts.push(node.accessMethod.toUpperCase());
     }
