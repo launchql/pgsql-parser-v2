@@ -212,7 +212,7 @@ describe('DDL Schema Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe("DROP SCHEMA 'test_schema'");
+      expect(deparser.visit(ast, context)).toBe("DROP SCHEMA test_schema");
     });
 
     it('should deparse DROP DATABASE statement', () => {
@@ -230,7 +230,7 @@ describe('DDL Schema Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe("DROP DATABASE 'test_db'");
+      expect(deparser.visit(ast, context)).toBe("DROP DATABASE test_db");
     });
 
     it('should deparse DROP FUNCTION statement', () => {

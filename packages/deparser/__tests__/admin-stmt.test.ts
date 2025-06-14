@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('Administrative Statement Deparsers', () => {
   const deparser = new Deparser([]);
@@ -10,25 +12,14 @@ describe('Administrative Statement Deparsers', () => {
       const ast = {
         CallStmt: {
           funccall: {
-            FuncCall: {
-              funcname: [{ String: { sval: 'my_procedure' } }],
-              args: [
-                { A_Const: { val: { Integer: { ival: 123 } } } },
-                { A_Const: { val: { String: { sval: 'test' } } } }
-              ],
-              agg_order: null as any,
-              agg_filter: null as any,
-              over: null as any,
-              agg_within_group: false,
-              agg_star: false,
-              agg_distinct: false,
-              func_variadic: false,
-              funcformat: 'COERCE_EXPLICIT_CALL',
-              location: -1
-            }
-          },
-          funcexpr: null as any,
-          outargs: [] as any[]
+            funcname: [{ String: { sval: 'my_procedure' } }],
+            args: [
+              { A_Const: { ival: { ival: 123 }, location: -1 } },
+              { A_Const: { sval: { sval: 'test' }, location: -1 } }
+            ],
+            funcformat: 'COERCE_EXPLICIT_CALL',
+            location: -1
+          }
         }
       };
       
@@ -76,12 +67,14 @@ describe('Administrative Statement Deparsers', () => {
     it('should deparse CREATE DATABASE statement', () => {
       const ast = {
         CreatedbStmt: {
-          dbname: 'myapp',
-          options: [] as any[]
+          dbname: 'myapp'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('CREATE DATABASE "myapp"');
+      
+      const correctAst = parse('CREATE DATABASE "myapp"');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse CREATE DATABASE statement with options', () => {
@@ -91,7 +84,6 @@ describe('Administrative Statement Deparsers', () => {
           options: [
             {
               DefElem: {
-                defnamespace: null as string | null,
                 defname: 'owner',
                 arg: { String: { sval: 'postgres' } },
                 defaction: 'DEFELEM_UNSPEC',
@@ -100,7 +92,6 @@ describe('Administrative Statement Deparsers', () => {
             },
             {
               DefElem: {
-                defnamespace: null as string | null,
                 defname: 'encoding',
                 arg: { String: { sval: 'UTF8' } },
                 defaction: 'DEFELEM_UNSPEC',
@@ -112,13 +103,16 @@ describe('Administrative Statement Deparsers', () => {
       };
       
       expect(deparser.visit(ast, context)).toBe('CREATE DATABASE "testdb" WITH owner = \'postgres\' encoding = \'UTF8\'');
+      
+      const correctAst = parse('CREATE DATABASE "testdb" WITH owner = \'postgres\' encoding = \'UTF8\'');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should throw error for CREATE DATABASE without dbname', () => {
       const ast = {
         CreatedbStmt: {
           dbname: null as string | null,
-          options: [] as any[]
+          options: [] as any[] as any[]
         }
       };
       
@@ -130,25 +124,28 @@ describe('Administrative Statement Deparsers', () => {
     it('should deparse DROP DATABASE statement', () => {
       const ast = {
         DropdbStmt: {
-          dbname: 'olddb',
-          missing_ok: false,
-          options: [] as any[]
+          dbname: 'olddb'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('DROP DATABASE "olddb"');
+      
+      const correctAst = parse('DROP DATABASE "olddb"');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP DATABASE IF EXISTS statement', () => {
       const ast = {
         DropdbStmt: {
           dbname: 'tempdb',
-          missing_ok: true,
-          options: [] as any[]
+          missing_ok: true
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('DROP DATABASE IF EXISTS "tempdb"');
+      
+      const correctAst = parse('DROP DATABASE IF EXISTS "tempdb"');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP DATABASE statement with options', () => {
@@ -178,7 +175,7 @@ describe('Administrative Statement Deparsers', () => {
         DropdbStmt: {
           dbname: null as string | null,
           missing_ok: false,
-          options: [] as any[]
+          options: [] as any[] as any[]
         }
       };
       
@@ -191,7 +188,6 @@ describe('Administrative Statement Deparsers', () => {
       const ast = {
         RenameStmt: {
           renameType: 'OBJECT_TABLE',
-          relationType: null as any,
           relation: {
             RangeVar: {
               schemaname: null as string | null,
@@ -202,10 +198,7 @@ describe('Administrative Statement Deparsers', () => {
               location: -1
             }
           },
-          object: null as any,
-          subname: null as string | null,
           newname: 'new_table',
-          behavior: null as any,
           missing_ok: false
         }
       };
@@ -236,7 +229,7 @@ describe('Administrative Statement Deparsers', () => {
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('ALTER TABLE users RENAME COLUMN "old_column" "new_column"');
+      expect(deparser.visit(ast, context)).toBe('ALTER TABLE users RENAME COLUMN "old_column" TO "new_column"');
     });
 
     it('should deparse ALTER SCHEMA RENAME TO statement', () => {

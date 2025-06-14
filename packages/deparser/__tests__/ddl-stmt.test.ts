@@ -1,35 +1,37 @@
 import { Deparser } from '../src/deparser';
-import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('DDL Statement Deparsers', () => {
   const deparser = new Deparser([]);
-  const context: DeparserContext = {};
+  const context = {};
 
   describe('CreateSchemaStmt', () => {
     it('should deparse CREATE SCHEMA statement', () => {
       const ast = {
         CreateSchemaStmt: {
-          schemaname: 'test_schema',
-          authrole: null as any,
-          schemaElts: null as any[] | null,
-          if_not_exists: false
+          schemaname: 'test_schema'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA test_schema');
+      
+      const correctAst = parse('CREATE SCHEMA test_schema');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse CREATE SCHEMA IF NOT EXISTS statement', () => {
       const ast = {
         CreateSchemaStmt: {
           schemaname: 'test_schema',
-          authrole: null as any,
-          schemaElts: null as any[] | null,
           if_not_exists: true
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('CREATE SCHEMA IF NOT EXISTS test_schema');
+      
+      const correctAst = parse('CREATE SCHEMA IF NOT EXISTS test_schema');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse CREATE SCHEMA with AUTHORIZATION', () => {
@@ -40,11 +42,9 @@ describe('DDL Statement Deparsers', () => {
             RoleSpec: {
               roletype: 'ROLESPEC_CSTRING',
               rolename: 'test_user',
-              location: -1
+              location: 40
             }
-          },
-          schemaElts: null as any[] | null,
-          if_not_exists: false
+          }
         }
       };
       
@@ -54,16 +54,13 @@ describe('DDL Statement Deparsers', () => {
     it('should deparse CREATE SCHEMA without name (AUTHORIZATION only)', () => {
       const ast = {
         CreateSchemaStmt: {
-          schemaname: null as string | null,
           authrole: {
             RoleSpec: {
               roletype: 'ROLESPEC_CSTRING',
               rolename: 'test_user',
-              location: -1
+              location: 28
             }
-          },
-          schemaElts: null as any[] | null,
-          if_not_exists: false
+          }
         }
       };
       
@@ -76,97 +73,135 @@ describe('DDL Statement Deparsers', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'users' } }]
+            {
+              List: {
+                items: [
+                  { String: { sval: 'users' } }
+                ]
+              }
+            }
           ],
-          removeType: 'OBJECT_TABLE' as const,
-          behavior: null as string | null,
-          missing_ok: false,
-          concurrent: false
+          removeType: 'OBJECT_TABLE',
+          behavior: 'DROP_RESTRICT'
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('DROP TABLE users');
+      expect(deparser.visit(ast, context)).toBe('DROP TABLE users RESTRICT');
+      
+      const correctAst = parse('DROP TABLE users RESTRICT');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP TABLE IF EXISTS statement', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'users' } }]
+            {
+              List: {
+                items: [
+                  { String: { sval: 'users' } }
+                ]
+              }
+            }
           ],
-          removeType: 'OBJECT_TABLE' as const,
-          behavior: null as string | null,
-          missing_ok: true,
-          concurrent: false
+          removeType: 'OBJECT_TABLE',
+          behavior: 'DROP_RESTRICT',
+          missing_ok: true
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('DROP TABLE IF EXISTS users');
+      expect(deparser.visit(ast, context)).toBe('DROP TABLE IF EXISTS users RESTRICT');
+      
+      const correctAst = parse('DROP TABLE IF EXISTS users RESTRICT');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP TABLE CASCADE statement', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'users' } }]
+            {
+              List: {
+                items: [
+                  { String: { sval: 'users' } }
+                ]
+              }
+            }
           ],
-          removeType: 'OBJECT_TABLE' as const,
-          behavior: 'DROP_CASCADE' as const,
-          missing_ok: false,
-          concurrent: false
+          removeType: 'OBJECT_TABLE',
+          behavior: 'DROP_CASCADE'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('DROP TABLE users CASCADE');
+      
+      const correctAst = parse('DROP TABLE users CASCADE');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP INDEX CONCURRENTLY statement', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'idx_users_email' } }]
+            {
+              List: {
+                items: [
+                  { String: { sval: 'idx_users_email' } }
+                ]
+              }
+            }
           ],
-          removeType: 'OBJECT_INDEX' as const,
-          behavior: null as string | null,
-          missing_ok: false,
+          removeType: 'OBJECT_INDEX',
+          behavior: 'DROP_RESTRICT',
           concurrent: true
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('DROP INDEX CONCURRENTLY idx_users_email');
+      expect(deparser.visit(ast, context)).toBe('DROP INDEX CONCURRENTLY idx_users_email RESTRICT');
     });
 
     it('should deparse DROP SCHEMA statement', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'test_schema' } }]
+            { String: { sval: 'test_schema' } }
           ],
-          removeType: 'OBJECT_SCHEMA' as const,
-          behavior: 'DROP_RESTRICT' as const,
-          missing_ok: false,
-          concurrent: false
+          removeType: 'OBJECT_SCHEMA',
+          behavior: 'DROP_RESTRICT'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('DROP SCHEMA test_schema RESTRICT');
+      
+      const correctAst = parse('DROP SCHEMA test_schema RESTRICT');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse DROP multiple objects statement', () => {
       const ast = {
         DropStmt: {
           objects: [
-            [{ String: { sval: 'table1' } }],
-            [{ String: { sval: 'table2' } }]
+            {
+              List: {
+                items: [
+                  { String: { sval: 'table1' } }
+                ]
+              }
+            },
+            {
+              List: {
+                items: [
+                  { String: { sval: 'table2' } }
+                ]
+              }
+            }
           ],
-          removeType: 'OBJECT_TABLE' as const,
-          behavior: null as string | null,
-          missing_ok: false,
-          concurrent: false
+          removeType: 'OBJECT_TABLE',
+          behavior: 'DROP_RESTRICT'
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('DROP TABLE table1, table2');
+      expect(deparser.visit(ast, context)).toBe('DROP TABLE table1, table2 RESTRICT');
     });
 
     it('should throw error for unsupported DROP object type', () => {
@@ -175,8 +210,8 @@ describe('DDL Statement Deparsers', () => {
           objects: [
             [{ String: { sval: 'test' } }]
           ],
-          removeType: 'INVALID_TYPE' as any,
-          behavior: null as string | null,
+          removeType: 'INVALID_TYPE',
+          behavior: null as any,
           missing_ok: false,
           concurrent: false
         }
@@ -193,21 +228,21 @@ describe('DDL Statement Deparsers', () => {
           relations: [
             {
               RangeVar: {
-                schemaname: null as string | null,
                 relname: 'users',
                 inh: true,
-                relpersistence: 'p' as const,
-                alias: null as any,
-                location: -1
+                relpersistence: 'p',
+                location: 9
               }
             }
           ],
-          restart_seqs: false,
-          behavior: null as string | null
+          behavior: 'DROP_RESTRICT'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('TRUNCATE users');
+      
+      const correctAst = parse('TRUNCATE users');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse TRUNCATE RESTART IDENTITY statement', () => {
@@ -216,21 +251,22 @@ describe('DDL Statement Deparsers', () => {
           relations: [
             {
               RangeVar: {
-                schemaname: null as string | null,
                 relname: 'users',
                 inh: true,
-                relpersistence: 'p' as const,
-                alias: null as any,
-                location: -1
+                relpersistence: 'p',
+                location: 9
               }
             }
           ],
           restart_seqs: true,
-          behavior: null as string | null
+          behavior: 'DROP_RESTRICT'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('TRUNCATE users RESTART IDENTITY');
+      
+      const correctAst = parse('TRUNCATE users RESTART IDENTITY');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse TRUNCATE CASCADE statement', () => {
@@ -239,21 +275,21 @@ describe('DDL Statement Deparsers', () => {
           relations: [
             {
               RangeVar: {
-                schemaname: null as string | null,
                 relname: 'users',
                 inh: true,
-                relpersistence: 'p' as const,
-                alias: null as any,
-                location: -1
+                relpersistence: 'p',
+                location: 9
               }
             }
           ],
-          restart_seqs: false,
-          behavior: 'DROP_CASCADE' as const
+          behavior: 'DROP_CASCADE'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('TRUNCATE users CASCADE');
+      
+      const correctAst = parse('TRUNCATE users CASCADE');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse TRUNCATE multiple tables statement', () => {
@@ -262,31 +298,29 @@ describe('DDL Statement Deparsers', () => {
           relations: [
             {
               RangeVar: {
-                schemaname: null as string | null,
                 relname: 'users',
                 inh: true,
-                relpersistence: 'p' as const,
-                alias: null as any,
-                location: -1
+                relpersistence: 'p',
+                location: 9
               }
             },
             {
               RangeVar: {
-                schemaname: null as string | null,
                 relname: 'orders',
                 inh: true,
-                relpersistence: 'p' as const,
-                alias: null as any,
-                location: -1
+                relpersistence: 'p',
+                location: 16
               }
             }
           ],
-          restart_seqs: false,
-          behavior: null as string | null
+          behavior: 'DROP_RESTRICT'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('TRUNCATE users, orders');
+      
+      const correctAst = parse('TRUNCATE users, orders');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
   });
 });

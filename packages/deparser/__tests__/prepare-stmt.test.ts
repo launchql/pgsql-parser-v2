@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('Prepare Statement Deparsers', () => {
   const deparser = new Deparser([]);

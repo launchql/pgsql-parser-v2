@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('Expression Statement Deparsers', () => {
   const deparser = new Deparser([]);
@@ -162,9 +164,9 @@ describe('Expression Statement Deparsers', () => {
           aggfilter: null as any,
           aggstar: true,
           aggvariadic: false,
-          aggkind: 'n' as const,
+          aggkind: 'n',
           agglevelsup: 0,
-          aggsplit: 'AGGSPLIT_SIMPLE' as const,
+          aggsplit: 'AGGSPLIT_SIMPLE',
           aggno: -1,
           aggtransno: -1,
           location: -1
@@ -197,9 +199,9 @@ describe('Expression Statement Deparsers', () => {
           aggfilter: null as any,
           aggstar: false,
           aggvariadic: false,
-          aggkind: 'n' as const,
+          aggkind: 'n',
           agglevelsup: 0,
-          aggsplit: 'AGGSPLIT_SIMPLE' as const,
+          aggsplit: 'AGGSPLIT_SIMPLE',
           aggno: -1,
           aggtransno: -1,
           location: -1
@@ -239,9 +241,9 @@ describe('Expression Statement Deparsers', () => {
           aggfilter: null as any,
           aggstar: false,
           aggvariadic: false,
-          aggkind: 'n' as const,
+          aggkind: 'n',
           agglevelsup: 0,
-          aggsplit: 'AGGSPLIT_SIMPLE' as const,
+          aggsplit: 'AGGSPLIT_SIMPLE',
           aggno: -1,
           aggtransno: -1,
           location: -1
@@ -295,8 +297,8 @@ describe('Expression Statement Deparsers', () => {
                         location: -1
                       }
                     },
-                    sortby_dir: 'SORTBY_ASC' as const,
-                    sortby_nulls: 'SORTBY_NULLS_DEFAULT' as const,
+                    sortby_dir: 'SORTBY_ASC',
+                    sortby_nulls: 'SORTBY_NULLS_DEFAULT',
                     useOp: null as any,
                     location: -1
                   }
@@ -328,7 +330,7 @@ describe('Expression Statement Deparsers', () => {
           resulttype: 25,
           resulttypmod: -1,
           resultcollid: 0,
-          relabelformat: 'COERCE_IMPLICIT_CAST' as const,
+          relabelformat: 'COERCE_IMPLICIT_CAST',
           location: -1
         }
       };
@@ -342,7 +344,7 @@ describe('Expression Statement Deparsers', () => {
           arg: { Integer: { ival: 42 } },
           resulttype: 25,
           resultcollid: 0,
-          coerceformat: 'COERCE_EXPLICIT_CAST' as const,
+          coerceformat: 'COERCE_EXPLICIT_CAST',
           location: -1
         }
       };
@@ -363,7 +365,7 @@ describe('Expression Statement Deparsers', () => {
           resulttype: 1007,
           resulttypmod: -1,
           resultcollid: 0,
-          coerceformat: 'COERCE_EXPLICIT_CAST' as const,
+          coerceformat: 'COERCE_EXPLICIT_CAST',
           location: -1
         }
       };
@@ -378,13 +380,13 @@ describe('Expression Statement Deparsers', () => {
             RowExpr: {
               args: [{ Integer: { ival: 1 } }, { String: { sval: 'test' } }],
               row_typeid: 2249,
-              row_format: 'COERCE_EXPLICIT_CALL' as const,
+              row_format: 'COERCE_EXPLICIT_CALL',
               colnames: null as any,
               location: -1
             }
           },
           resulttype: 2249,
-          convertformat: 'COERCE_EXPLICIT_CAST' as const,
+          convertformat: 'COERCE_EXPLICIT_CAST',
           location: -1
         }
       };

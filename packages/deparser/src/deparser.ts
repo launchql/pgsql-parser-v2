@@ -1002,6 +1002,13 @@ export class Deparser implements DeparserVisitor {
     return 'NULL'; 
   }
 
+  List(node: t.List['List'], context: DeparserContext): string {
+    if (!node.items || node.items.length === 0) {
+      return '';
+    }
+    return node.items.map(item => this.visit(item, context)).join(', ');
+  }
+
   CreateStmt(node: t.CreateStmt['CreateStmt'], context: DeparserContext): string {
     const output: string[] = ['CREATE'];
 
@@ -1787,6 +1794,13 @@ export class Deparser implements DeparserVisitor {
     return '';
   }
 
+  roletype(node: any, context: DeparserContext): string {
+    if (node.rolename) {
+      return node.rolename;
+    }
+    return '';
+  }
+
   DropStmt(node: t.DropStmt['DropStmt'], context: DeparserContext): string {
     const output: string[] = ['DROP'];
 
@@ -1850,25 +1864,15 @@ export class Deparser implements DeparserVisitor {
           return objList.map(obj => this.visit(obj, context)).join('.');
         }
         const objName = this.visit(objList, context);
-        if (node.removeType === 'OBJECT_SCHEMA' || node.removeType === 'OBJECT_DATABASE') {
-          return `'${objName}'`;
-        }
         return objName;
       }).join(', ');
       output.push(objects);
     }
 
-    if (node.behavior) {
-      switch (node.behavior) {
-        case 'DROP_CASCADE':
-          output.push('CASCADE');
-          break;
-        case 'DROP_RESTRICT':
-          output.push('RESTRICT');
-          break;
-        default:
-          throw new Error(`Unsupported DROP behavior: ${node.behavior}`);
-      }
+    if (node.behavior === 'DROP_CASCADE') {
+      output.push('CASCADE');
+    } else if (node.behavior === 'DROP_RESTRICT') {
+      output.push('RESTRICT');
     }
 
     return output.join(' ');
@@ -1888,15 +1892,8 @@ export class Deparser implements DeparserVisitor {
       output.push('RESTART IDENTITY');
     }
 
-    if (node.behavior) {
-      switch (node.behavior) {
-        case 'DROP_CASCADE':
-          output.push('CASCADE');
-          break;
-        case 'DROP_RESTRICT':
-          output.push('RESTRICT');
-          break;
-      }
+    if (node.behavior === 'DROP_CASCADE') {
+      output.push('CASCADE');
     }
 
     return output.join(' ');
@@ -3097,7 +3094,27 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['CALL'];
     
     if (node.funccall) {
-      output.push(this.visit(node.funccall, context));
+      const funcCall = node.funccall as any;
+      
+      if (funcCall.funcname && funcCall.funcname.length > 0) {
+        const funcNameParts = funcCall.funcname.map((nameNode: any) => {
+          if (nameNode.String) {
+            return nameNode.String.sval;
+          }
+          return this.visit(nameNode, context);
+        });
+        const funcName = funcNameParts.join('.');
+        
+        let argsStr = '';
+        if (funcCall.args && funcCall.args.length > 0) {
+          const argStrs = funcCall.args.map((arg: any) => this.visit(arg, context));
+          argsStr = `(${argStrs.join(', ')})`;
+        } else {
+          argsStr = '()';
+        }
+        
+        output.push(`${funcName}${argsStr}`);
+      }
     } else if (node.funcexpr) {
       output.push(this.visit(node.funcexpr, context));
     } else {
@@ -3199,7 +3216,7 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.renameType === 'OBJECT_COLUMN' && node.subname) {
-      output.push('RENAME COLUMN', `"${node.subname}"`);
+      output.push('RENAME COLUMN', `"${node.subname}"`, 'TO');
     } else {
       output.push('RENAME TO');
     }
@@ -3942,7 +3959,15 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.sequence) {
-      output.push(this.visit(node.sequence, context));
+      const sequenceName: string[] = [];
+      const seq = node.sequence as any;
+      if (seq.schemaname) {
+        sequenceName.push(QuoteUtils.quote(seq.schemaname));
+      }
+      if (seq.relname) {
+        sequenceName.push(QuoteUtils.quote(seq.relname));
+      }
+      output.push(sequenceName.join('.'));
     }
     
     if (node.options && node.options.length > 0) {
@@ -3964,7 +3989,15 @@ export class Deparser implements DeparserVisitor {
     }
     
     if (node.sequence) {
-      output.push(this.visit(node.sequence, context));
+      const sequenceName: string[] = [];
+      const seq = node.sequence as any;
+      if (seq.schemaname) {
+        sequenceName.push(QuoteUtils.quote(seq.schemaname));
+      }
+      if (seq.relname) {
+        sequenceName.push(QuoteUtils.quote(seq.relname));
+      }
+      output.push(sequenceName.join('.'));
     }
     
     if (node.options && node.options.length > 0) {

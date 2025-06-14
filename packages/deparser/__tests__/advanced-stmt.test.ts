@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('Advanced Statement Deparsers', () => {
   const deparser = new Deparser([]);
@@ -143,7 +145,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -169,7 +171,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -195,7 +197,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -237,7 +239,7 @@ describe('Advanced Statement Deparsers', () => {
                     schemaname: null as string | null,
                     relname: 'users',
                     inh: true,
-                    relpersistence: 'p' as const,
+                    relpersistence: 'p',
                     alias: null as any,
                     location: -1
                   }
@@ -269,7 +271,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -295,7 +297,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -323,7 +325,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -364,7 +366,7 @@ describe('Advanced Statement Deparsers', () => {
               }
             }
           ],
-          objtype: 'OBJECT_TABLE' as const,
+          objtype: 'OBJECT_TABLE',
           missing_ok: false
         }
       };
@@ -380,7 +382,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -391,12 +393,12 @@ describe('Advanced Statement Deparsers', () => {
                 subtype: 'AT_DropColumn',
                 name: 'old_column',
                 def: null as any,
-                behavior: 'DROP_CASCADE' as const,
+                behavior: 'DROP_CASCADE',
                 missing_ok: false
               }
             }
           ],
-          objtype: 'OBJECT_TABLE' as const,
+          objtype: 'OBJECT_TABLE',
           missing_ok: true
         }
       };
@@ -412,7 +414,7 @@ describe('Advanced Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'idx_users_email',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -428,7 +430,7 @@ describe('Advanced Statement Deparsers', () => {
               }
             }
           ],
-          objtype: 'OBJECT_INDEX' as const,
+          objtype: 'OBJECT_INDEX',
           missing_ok: false
         }
       };

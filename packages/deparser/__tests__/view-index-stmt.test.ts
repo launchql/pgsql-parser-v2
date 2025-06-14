@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('View and Index Statement Deparsers', () => {
   const deparser = new Deparser([]);
@@ -64,7 +66,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'test_view',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -88,7 +90,7 @@ describe('View and Index Statement Deparsers', () => {
                     schemaname: null as string | null,
                     relname: 'users',
                     inh: true,
-                    relpersistence: 'p' as const,
+                    relpersistence: 'p',
                     alias: null as any,
                     location: -1
                   }
@@ -129,7 +131,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'test_view',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -153,7 +155,7 @@ describe('View and Index Statement Deparsers', () => {
                     schemaname: null as string | null,
                     relname: 'users',
                     inh: true,
-                    relpersistence: 'p' as const,
+                    relpersistence: 'p',
                     alias: null as any,
                     location: -1
                   }
@@ -194,7 +196,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'test_view',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -221,7 +223,7 @@ describe('View and Index Statement Deparsers', () => {
                     schemaname: null as string | null,
                     relname: 'users',
                     inh: true,
-                    relpersistence: 'p' as const,
+                    relpersistence: 'p',
                     alias: null as any,
                     location: -1
                   }
@@ -262,7 +264,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'test_view',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -286,7 +288,7 @@ describe('View and Index Statement Deparsers', () => {
                     schemaname: null as string | null,
                     relname: 'users',
                     inh: true,
-                    relpersistence: 'p' as const,
+                    relpersistence: 'p',
                     alias: null as any,
                     location: -1
                   }
@@ -312,7 +314,7 @@ describe('View and Index Statement Deparsers', () => {
           },
           replace: false,
           options: null as any[] | null,
-          withCheckOption: 'CASCADED_CHECK_OPTION' as const
+          withCheckOption: 'CASCADED_CHECK_OPTION'
         }
       };
       
@@ -330,7 +332,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -385,7 +387,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -440,7 +442,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -495,7 +497,7 @@ describe('View and Index Statement Deparsers', () => {
               schemaname: null as string | null,
               relname: 'users',
               inh: true,
-              relpersistence: 'p' as const,
+              relpersistence: 'p',
               alias: null as any,
               location: -1
             }
@@ -520,7 +522,7 @@ describe('View and Index Statement Deparsers', () => {
           options: null as any[] | null,
           whereClause: {
             A_Expr: {
-              kind: 'AEXPR_OP' as const,
+              kind: 'AEXPR_OP',
               name: [{ String: { sval: '=' } }],
               lexpr: {
                 ColumnRef: {

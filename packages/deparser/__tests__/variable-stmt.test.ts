@@ -1,5 +1,7 @@
 import { Deparser } from '../src/deparser';
 import { DeparserContext } from '../src/visitors/base';
+import { parse } from '@pgsql/parser';
+import { cleanTree } from '../src/utils';
 
 describe('Variable Statement Deparsers', () => {
   const deparser = new Deparser([]);
@@ -11,12 +13,14 @@ describe('Variable Statement Deparsers', () => {
         VariableSetStmt: {
           kind: 'VAR_SET_VALUE',
           name: 'timezone',
-          args: [{ String: { sval: 'UTC' } }],
-          is_local: false
+          args: [{ A_Const: { sval: { sval: 'UTC' }, location: 15 } }]
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('SET timezone = UTC');
+      expect(deparser.visit(ast, context)).toBe('SET timezone = \'UTC\'');
+      
+      const correctAst = parse('SET timezone = \'UTC\'');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse SET LOCAL variable = value statement', () => {
@@ -24,64 +28,70 @@ describe('Variable Statement Deparsers', () => {
         VariableSetStmt: {
           kind: 'VAR_SET_VALUE',
           name: 'work_mem',
-          args: [{ String: { sval: '64MB' } }],
+          args: [{ A_Const: { sval: { sval: '64MB' }, location: 21 } }],
           is_local: true
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('SET LOCAL work_mem = 64MB');
+      expect(deparser.visit(ast, context)).toBe('SET LOCAL work_mem = \'64MB\'');
+      
+      const correctAst = parse('SET LOCAL work_mem = \'64MB\'');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse SET variable TO DEFAULT statement', () => {
       const ast = {
         VariableSetStmt: {
           kind: 'VAR_SET_DEFAULT',
-          name: 'timezone',
-          args: null as any[] | null,
-          is_local: false
+          name: 'timezone'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('SET timezone TO DEFAULT');
+      
+      const correctAst = parse('SET timezone TO DEFAULT');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse SET variable FROM CURRENT statement', () => {
       const ast = {
         VariableSetStmt: {
           kind: 'VAR_SET_CURRENT',
-          name: 'timezone',
-          args: null as any[] | null,
-          is_local: false
+          name: 'timezone'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('SET timezone FROM CURRENT');
+      
+      const correctAst = parse('SET timezone FROM CURRENT');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse RESET variable statement', () => {
       const ast = {
         VariableSetStmt: {
           kind: 'VAR_RESET',
-          name: 'timezone',
-          args: null as any[] | null,
-          is_local: false
+          name: 'timezone'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('RESET timezone');
+      
+      const correctAst = parse('RESET timezone');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse RESET ALL statement', () => {
       const ast = {
         VariableSetStmt: {
-          kind: 'VAR_RESET_ALL',
-          name: null as string | null,
-          args: null as any[] | null,
-          is_local: false
+          kind: 'VAR_RESET_ALL'
         }
       };
       
       expect(deparser.visit(ast, context)).toBe('RESET ALL');
+      
+      const correctAst = parse('RESET ALL');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should throw error for unsupported variable set kind', () => {
@@ -107,16 +117,22 @@ describe('Variable Statement Deparsers', () => {
       };
       
       expect(deparser.visit(ast, context)).toBe('SHOW timezone');
+      
+      const correctAst = parse('SHOW timezone');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse SHOW ALL statement', () => {
       const ast = {
         VariableShowStmt: {
-          name: 'ALL'
+          name: 'all'
         }
       };
       
-      expect(deparser.visit(ast, context)).toBe('SHOW ALL');
+      expect(deparser.visit(ast, context)).toBe('SHOW all');
+      
+      const correctAst = parse('SHOW all');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
 
     it('should deparse SHOW with complex variable name', () => {
@@ -127,6 +143,9 @@ describe('Variable Statement Deparsers', () => {
       };
       
       expect(deparser.visit(ast, context)).toBe('SHOW log_statement');
+      
+      const correctAst = parse('SHOW log_statement');
+      expect(cleanTree(ast)).toEqual(cleanTree(correctAst.stmts![0].stmt));
     });
   });
 });
