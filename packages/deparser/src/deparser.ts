@@ -1389,4 +1389,186 @@ export class Deparser implements DeparserVisitor {
 
     return parts.join(' ');
   }
+
+  RoleSpec(node: t.RoleSpec['RoleSpec'], context: DeparserContext): string {
+    switch (node.roletype) {
+      case 'ROLESPEC_CSTRING':
+        return QuoteUtils.quote(node.rolename!);
+      case 'ROLESPEC_CURRENT_USER':
+        return 'CURRENT_USER';
+      case 'ROLESPEC_CURRENT_ROLE':
+        return 'CURRENT_ROLE';
+      case 'ROLESPEC_SESSION_USER':
+        return 'SESSION_USER';
+      case 'ROLESPEC_PUBLIC':
+        return 'PUBLIC';
+      default:
+        return QuoteUtils.quote(node.rolename!);
+    }
+  }
+
+  AccessPriv(node: t.AccessPriv['AccessPriv'], context: DeparserContext): string {
+    const name = node.priv_name ? node.priv_name.toUpperCase() : '';
+    const cols = ListUtils.unwrapList(node.cols).map(c => this.visit(c, context));
+    if (cols.length) {
+      return `${name}${this.formatter.parens(cols.join(', '))}`.trim();
+    }
+    return name;
+  }
+
+  GrantStmt(node: t.GrantStmt['GrantStmt'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    if (node.is_grant) {
+      parts.push('GRANT');
+    } else {
+      parts.push('REVOKE');
+      if (node.grant_option) {
+        parts.push('GRANT OPTION FOR');
+      }
+    }
+
+    const privs = ListUtils.unwrapList(node.privileges).map(p => this.visit(p, context));
+    if (privs.length) {
+      parts.push(privs.join(', '));
+    } else {
+      parts.push('ALL');
+    }
+
+    parts.push('ON');
+
+    const typeMap: Record<string, string> = {
+      OBJECT_TABLE: 'TABLE',
+      OBJECT_SEQUENCE: 'SEQUENCE',
+      OBJECT_DATABASE: 'DATABASE',
+      OBJECT_SCHEMA: 'SCHEMA',
+      OBJECT_FUNCTION: 'FUNCTION',
+      OBJECT_LANGUAGE: 'LANGUAGE',
+      OBJECT_LARGEOBJECT: 'LARGE OBJECT',
+      OBJECT_VIEW: 'VIEW',
+      OBJECT_MATVIEW: 'MATERIALIZED VIEW',
+      OBJECT_TYPE: 'TYPE',
+      OBJECT_TABLESPACE: 'TABLESPACE'
+    };
+
+    let objType = typeMap[node.objtype as string];
+    if (!objType) {
+      objType = (node.objtype || '').replace('OBJECT_', '');
+    }
+
+    if (node.targtype === 'ACL_TARGET_ALL_IN_SCHEMA') {
+      parts.push(`ALL ${objType}s IN SCHEMA`);
+    } else if (node.targtype === 'ACL_TARGET_DEFAULTS') {
+      parts.push(objType + 'S');
+    } else {
+      parts.push(objType);
+    }
+
+    const objs = ListUtils.unwrapList(node.objects).map(o => this.visit(o, context));
+    if (objs.length) {
+      parts.push(objs.join(', '));
+    }
+
+    if (node.is_grant) {
+      parts.push('TO');
+    } else {
+      parts.push('FROM');
+    }
+    const grantees = ListUtils.unwrapList(node.grantees).map(g => this.visit(g, context));
+    if (grantees.length) {
+      parts.push(grantees.join(', '));
+    }
+
+    if (node.is_grant && node.grant_option) {
+      parts.push('WITH GRANT OPTION');
+    }
+
+    if (node.grantor) {
+      parts.push('GRANTED BY');
+      parts.push(this.visit(node.grantor, context));
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  GrantRoleStmt(node: t.GrantRoleStmt['GrantRoleStmt'], context: DeparserContext): string {
+    const parts: string[] = [];
+
+    const optAdmin = ListUtils.unwrapList(node.opt).some(opt => {
+      if (this.getNodeType(opt) === 'DefElem') {
+        const d = this.getNodeData(opt);
+        return d.defname === 'admin' && d.arg?.Boolean?.boolval;
+      }
+      return false;
+    });
+
+    if (node.is_grant) {
+      parts.push('GRANT');
+    } else {
+      parts.push('REVOKE');
+      if (optAdmin) {
+        parts.push('ADMIN OPTION FOR');
+      }
+    }
+
+    const granted = ListUtils.unwrapList(node.granted_roles).map(r => this.visit(r, context));
+    if (granted.length) {
+      parts.push(granted.join(', '));
+    }
+
+    if (node.is_grant) {
+      parts.push('TO');
+    } else {
+      parts.push('FROM');
+    }
+
+    const grantees = ListUtils.unwrapList(node.grantee_roles).map(r => this.visit(r, context));
+    if (grantees.length) {
+      parts.push(grantees.join(', '));
+    }
+
+    if (node.is_grant && optAdmin) {
+      parts.push('WITH ADMIN OPTION');
+    }
+
+    if (node.grantor) {
+      parts.push('GRANTED BY');
+      parts.push(this.visit(node.grantor, context));
+    }
+
+    if (node.behavior === 'DROP_CASCADE') {
+      parts.push('CASCADE');
+    }
+
+    return parts.join(' ');
+  }
+
+  AlterDefaultPrivilegesStmt(node: t.AlterDefaultPrivilegesStmt['AlterDefaultPrivilegesStmt'], context: DeparserContext): string {
+    const parts: string[] = ['ALTER DEFAULT PRIVILEGES'];
+
+    const options = ListUtils.unwrapList(node.options);
+    for (const opt of options) {
+      if (this.getNodeType(opt) === 'DefElem') {
+        const d = this.getNodeData(opt);
+        const names = ListUtils.unwrapList(d.arg).map(a => this.visit(a, context)).join(', ');
+        if (d.defname === 'schemas') {
+          parts.push('IN SCHEMA');
+          parts.push(names);
+        } else if (d.defname === 'roles') {
+          parts.push('FOR ROLE');
+          parts.push(names);
+        }
+      }
+    }
+
+    if (node.action) {
+      parts.push(this.visit(node.action, context));
+    }
+
+    return parts.join(' ');
+  }
 }
