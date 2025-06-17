@@ -117,6 +117,7 @@ export interface RenameStmt {
 So the RangeVar would be "inlined", not "wrapped", so if you were in the deparser method for RenameStmt, you would do this.RangeVar(node.relation, context), not this.deparse(node.relation, context) and not this.visit(node.relation, context)
 
 
+** also note that, the packages/deparser/reference folder is just for reference, don't write code there or use that code. THat was the old PG 13 code. It's also the C code deparser in case it helps.
 
 
 FUTURE STUFF, after we get deparser working
