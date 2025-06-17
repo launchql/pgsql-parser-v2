@@ -1,20 +1,19 @@
 import { Deparser } from '../src/deparser';
 import { parse } from '@pgsql/parser';
-import { cleanTree } from '../src/utils';  
+import { cleanTree } from '../src/utils';
+import * as t from '@pgsql/types';
 
 describe('CREATE TABLE statements', () => {
   describe('basic CREATE TABLE', () => {
     it('should deparse simple CREATE TABLE', () => {
-      const ast = {
+      const ast: { RawStmt: t.RawStmt } = {
         RawStmt: {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'users',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'users',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
@@ -48,16 +47,14 @@ describe('CREATE TABLE statements', () => {
     });
 
     it('should deparse CREATE TABLE IF NOT EXISTS', () => {
-      const ast = {
+      const ast: { RawStmt: t.RawStmt } = {
         RawStmt: {
           stmt: {
             CreateStmt: {
               relation: {
-                RangeVar: {
-                  relname: 'products',
-                  inh: true,
-                  relpersistence: 'p'
-                }
+                relname: 'products',
+                inh: true,
+                relpersistence: 'p'
               },
               tableElts: [
                 {
