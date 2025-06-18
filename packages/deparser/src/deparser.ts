@@ -156,7 +156,7 @@ export class Deparser implements DeparserVisitor {
 
     if (node.intoClause) {
       output.push('INTO');
-      output.push(this.visit(node.intoClause as Node, context));
+      output.push(this.IntoClause(node.intoClause, context));
     }
 
     if (node.fromClause) {
@@ -2426,6 +2426,10 @@ export class Deparser implements DeparserVisitor {
       output.push(this.visit(node.larg, context));
     }
     
+    if (node.isNatural) {
+      output.push('NATURAL');
+    }
+    
     switch (node.jointype) {
       case 'JOIN_INNER':
         output.push('INNER JOIN');
@@ -2618,6 +2622,17 @@ export class Deparser implements DeparserVisitor {
   RoleSpec(node: t.RoleSpec, context: DeparserContext): string {
     if (node.rolename) {
       return node.rolename;
+    }
+    
+    switch (node.roletype) {
+      case 'ROLESPEC_PUBLIC':
+        return 'public';
+      case 'ROLESPEC_CURRENT_USER':
+        return 'CURRENT_USER';
+      case 'ROLESPEC_SESSION_USER':
+        return 'SESSION_USER';
+      default:
+        return 'public';
     }
     return '';
   }
@@ -4715,8 +4730,14 @@ export class Deparser implements DeparserVisitor {
     const output: string[] = ['DO'];
     
     if (node.args && node.args.length > 0) {
-      const args = ListUtils.unwrapList(node.args).map(arg => this.visit(arg, context));
-      output.push(args.join(' '));
+      const args = ListUtils.unwrapList(node.args);
+      for (const arg of args) {
+        if (arg.DefElem && arg.DefElem.defname === 'as' && arg.DefElem.arg && arg.DefElem.arg.String) {
+          output.push(`$$${arg.DefElem.arg.String.sval}$$`);
+        } else {
+          output.push(this.visit(arg, context));
+        }
+      }
     }
     
     return output.join(' ');
@@ -5591,6 +5612,9 @@ export class Deparser implements DeparserVisitor {
 
     switch (node.targtype) {
       case 'ACL_TARGET_OBJECT':
+        if (node.objtype === 'OBJECT_SCHEMA') {
+          output.push('SCHEMA');
+        }
         if (node.objects && node.objects.length > 0) {
           const objects = ListUtils.unwrapList(node.objects)
             .map(obj => this.visit(obj, context))
@@ -6966,7 +6990,7 @@ export class Deparser implements DeparserVisitor {
   }
 
   IntoClause(node: t.IntoClause, context: DeparserContext): string {
-    const output: string[] = ['INTO'];
+    const output: string[] = [];
     
     if (node.rel) {
       output.push(this.RangeVar(node.rel, context));
