@@ -1824,7 +1824,7 @@ export class Deparser implements DeparserVisitor {
     
     if (context.parentNodeTypes.includes('ObjectWithArgs')) {
       // Check if this is a pure operator symbol (only operator characters, no alphanumeric)
-      const pureOperatorRegex = /^[+*/<>=~!@#%^&|`?]+$/;
+      const pureOperatorRegex = /^[+\-*/<>=~!@#%^&|`?]+$/;
       if (pureOperatorRegex.test(value)) {
         return value; // Don't quote pure operator symbols like "="
       }
@@ -5508,6 +5508,30 @@ export class Deparser implements DeparserVisitor {
         case 'OBJECT_FOREIGN_TABLE':
           output.push('FOREIGN TABLE');
           break;
+        case 'OBJECT_LARGEOBJECT':
+          output.push('LARGE OBJECT');
+          break;
+        case 'OBJECT_OPCLASS':
+          output.push('OPERATOR CLASS');
+          break;
+        case 'OBJECT_OPFAMILY':
+          output.push('OPERATOR FAMILY');
+          break;
+        case 'OBJECT_STATISTIC_EXT':
+          output.push('STATISTICS');
+          break;
+        case 'OBJECT_TSCONFIGURATION':
+          output.push('TEXT SEARCH CONFIGURATION');
+          break;
+        case 'OBJECT_TSDICTIONARY':
+          output.push('TEXT SEARCH DICTIONARY');
+          break;
+        case 'OBJECT_TSPARSER':
+          output.push('TEXT SEARCH PARSER');
+          break;
+        case 'OBJECT_TSTEMPLATE':
+          output.push('TEXT SEARCH TEMPLATE');
+          break;
         default:
           output.push(node.objtype.replace('OBJECT_', ''));
       }
@@ -5550,6 +5574,43 @@ export class Deparser implements DeparserVisitor {
               output.push(rule);
               output.push('ON');
               output.push(table);
+            } else {
+              output.push(objectParts.join('.'));
+            }
+          } else if (node.objtype === 'OBJECT_OPCLASS') {
+            if (objectParts.length === 2) {
+              const [method, opclass] = objectParts;
+              output.push(opclass);
+              output.push('USING');
+              output.push(method);
+            } else {
+              output.push(objectParts.join('.'));
+            }
+          } else if (node.objtype === 'OBJECT_OPFAMILY') {
+            if (objectParts.length === 2) {
+              const [method, opfamily] = objectParts;
+              output.push(opfamily);
+              output.push('USING');
+              output.push(method);
+            } else {
+              output.push(objectParts.join('.'));
+            }
+          } else if (node.objtype === 'OBJECT_POLICY') {
+            if (objectParts.length === 2) {
+              const [table, policy] = objectParts;
+              output.push(policy);
+              output.push('ON');
+              output.push(table);
+            } else {
+              output.push(objectParts.join('.'));
+            }
+          } else if (node.objtype === 'OBJECT_TRANSFORM') {
+            if (objectParts.length === 2) {
+              const [type, language] = objectParts;
+              output.push('FOR');
+              output.push(type);
+              output.push('LANGUAGE');
+              output.push(language);
             } else {
               output.push(objectParts.join('.'));
             }
