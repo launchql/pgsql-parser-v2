@@ -1402,7 +1402,13 @@ export class Deparser implements DeparserVisitor {
       });
       output.push('AS', this.quoteIfNeeded(name) + this.formatter.parens(quotedColnames.join(', ')));
     } else {
-      output.push('AS', this.quoteIfNeeded(name));
+      const isTableAlias = context.parentNodeTypes.includes('RangeVar') || 
+                          context.parentNodeTypes.includes('SelectStmt');
+      if (isTableAlias) {
+        output.push(this.quoteIfNeeded(name));
+      } else {
+        output.push('AS', this.quoteIfNeeded(name));
+      }
     }
 
     return output.join(' ');
@@ -1653,7 +1659,7 @@ export class Deparser implements DeparserVisitor {
     let argStr = this.visit(node.arg, context);
     
     const argType = this.getNodeType(node.arg);
-    if (argType === 'TypeCast' || argType === 'SubLink' || argType === 'A_Expr' || argType === 'FuncCall' || argType === 'A_Indirection' || argType === 'ColumnRef' || argType === 'RowExpr') {
+    if (argType === 'TypeCast' || argType === 'SubLink' || argType === 'A_Expr' || argType === 'FuncCall' || argType === 'A_Indirection' || argType === 'RowExpr') {
       argStr = `(${argStr})`;
     }
     
@@ -1704,9 +1710,25 @@ export class Deparser implements DeparserVisitor {
   }
 
   TypeCast(node: t.TypeCast, context: DeparserContext): string {
+    const PG_NATIVE_TYPES = new Set([
+      'text', 'int', 'integer', 'bigint', 'smallint',
+      'bool', 'boolean', 'date', 'time', 'timestamp',
+      'interval', 'numeric', 'json', 'jsonb', 'varchar',
+      'char', 'real', 'double', 'decimal', 'float',
+      'timestamptz', 'timetz', 'box', 'point', 'polygon',
+      'circle', 'line', 'lseg', 'path', 'inet', 'cidr',
+      'macaddr', 'uuid', 'xml', 'bytea', 'bit', 'varbit',
+      'bpchar', 'regclass'
+    ]);
+
     const arg = this.visit(node.arg, context);
     const typeName = this.TypeName(node.typeName, context);
-    
+
+    function isPgNativeType(typeName: string): boolean {
+      const base = typeName.toLowerCase().split('(')[0].split('[')[0];
+      return PG_NATIVE_TYPES.has(base);
+    }
+
     // Check if this is a bpchar typecast that should use traditional char syntax
     if (typeName === 'bpchar' && node.typeName && node.typeName.names) {
       const names = ListUtils.unwrapList(node.typeName.names);
@@ -1716,14 +1738,15 @@ export class Deparser implements DeparserVisitor {
         return `char ${arg}`;
       }
     }
-    
-    if (typeName.startsWith('interval') || 
-        typeName.startsWith('char') || 
-        typeName === '"char"' ||
-        typeName.startsWith('bpchar')) {
+
+    if (typeName === 'interval') {
+      return `${arg}::interval`;
+    }
+
+    if (isPgNativeType(typeName)) {
       return `${arg}::${typeName}`;
     }
-    
+
     return `CAST(${arg} AS ${typeName})`;
   }
 
@@ -2003,7 +2026,9 @@ export class Deparser implements DeparserVisitor {
         const partParams = ListUtils.unwrapList(node.partspec.partParams)
           .map(param => this.visit(param, context))
           .join(', ');
-        output.push(`(${partParams})`);
+        // Remove the last strategy element and combine it with parentheses to avoid extra space
+        const strategy = output.pop();
+        output.push(`${strategy}(${partParams})`);
       }
     }
 
