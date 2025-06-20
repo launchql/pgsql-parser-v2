@@ -103,6 +103,13 @@ export class Deparser implements DeparserVisitor {
     return '';
   }
 
+  selectNeedsParens(node: t.SelectStmt): boolean {
+    return !!(node.op && node.op !== 'SETOP_NONE') || 
+           !!(node.sortClause) || 
+           !!(node.limitCount) || 
+           !!(node.limitOffset);
+  }
+
   SelectStmt(node: t.SelectStmt, context: DeparserContext): string {
     const output: string[] = [];
 
@@ -118,8 +125,15 @@ export class Deparser implements DeparserVisitor {
       const leftStmt = this.SelectStmt(node.larg as t.SelectStmt, context);
       const rightStmt = this.SelectStmt(node.rarg as t.SelectStmt, context);
       
-      // Always add parentheses around individual SELECT statements in set operations
-      output.push(this.formatter.parens(leftStmt));
+      // Only add parentheses if the SELECT statements have complex operations that need them
+      const needsLeftParens = this.selectNeedsParens(node.larg as t.SelectStmt);
+      const needsRightParens = this.selectNeedsParens(node.rarg as t.SelectStmt);
+      
+      if (needsLeftParens) {
+        output.push(this.formatter.parens(leftStmt));
+      } else {
+        output.push(leftStmt);
+      }
 
       switch (node.op) {
         case 'SETOP_UNION':
@@ -139,7 +153,11 @@ export class Deparser implements DeparserVisitor {
         output.push('ALL');
       }
 
-      output.push(this.formatter.parens(rightStmt));
+      if (needsRightParens) {
+        output.push(this.formatter.parens(rightStmt));
+      } else {
+        output.push(rightStmt);
+      }
     }
 
     if (node.distinctClause) {
@@ -1713,31 +1731,17 @@ export class Deparser implements DeparserVisitor {
     const PG_NATIVE_TYPES = new Set([
       'text', 'int', 'integer', 'bigint', 'smallint',
       'bool', 'boolean', 'date', 'time', 'timestamp',
-      'interval', 'numeric', 'json', 'jsonb', 'varchar',
-      'char', 'real', 'double', 'decimal', 'float',
-      'timestamptz', 'timetz', 'box', 'point', 'polygon',
-      'circle', 'line', 'lseg', 'path', 'inet', 'cidr',
-      'macaddr', 'uuid', 'xml', 'bytea', 'bit', 'varbit',
-      'bpchar', 'regclass'
+      'interval', 'numeric', 'json', 'jsonb', 'regclass',
+      'box', 'point', 'polygon', 'circle', 'line', 'lseg', 'path'
     ]);
 
-    const arg = this.visit(node.arg, context);
-    const typeName = this.TypeName(node.typeName, context);
-
     function isPgNativeType(typeName: string): boolean {
-      const base = typeName.toLowerCase().split('(')[0].split('[')[0];
+      const base = typeName.toLowerCase().split('(')[0];
       return PG_NATIVE_TYPES.has(base);
     }
 
-    // Check if this is a bpchar typecast that should use traditional char syntax
-    if (typeName === 'bpchar' && node.typeName && node.typeName.names) {
-      const names = ListUtils.unwrapList(node.typeName.names);
-      if (names.length === 2 && 
-          names[0].String?.sval === 'pg_catalog' && 
-          names[1].String?.sval === 'bpchar') {
-        return `char ${arg}`;
-      }
-    }
+    const arg = this.visit(node.arg, context);
+    const typeName = this.TypeName(node.typeName, context);
 
     if (typeName === 'interval') {
       return `${arg}::interval`;
@@ -10406,11 +10410,45 @@ export class Deparser implements DeparserVisitor {
     if (node.base && node.base.tableElts) {
       const elementStrs = ListUtils.unwrapList(node.base.tableElts).map(el => this.visit(el, context));
       output.push(`(${elementStrs.join(', ')})`);
-    } else {
+    } else if (!node.base || !node.base.partbound) {
       output.push('()');
     }
     
-    if (node.base && node.base.inhRelations && node.base.inhRelations.length > 0) {
+    if (node.base && node.base.partbound && node.base.inhRelations && node.base.inhRelations.length > 0) {
+      output.push('PARTITION OF');
+      const inherits = ListUtils.unwrapList(node.base.inhRelations);
+      const inheritStrs = inherits.map(rel => this.visit(rel, context));
+      output.push(inheritStrs[0]);
+      
+      if (node.base.partbound.strategy === 'l' && node.base.partbound.listdatums) {
+        output.push('FOR VALUES IN');
+        const listValues = ListUtils.unwrapList(node.base.partbound.listdatums)
+          .map(datum => this.visit(datum, context))
+          .join(', ');
+        output.push(`(${listValues})`);
+      } else if (node.base.partbound.strategy === 'r' && (node.base.partbound.lowerdatums || node.base.partbound.upperdatums)) {
+        output.push('FOR VALUES FROM');
+        if (node.base.partbound.lowerdatums) {
+          const lowerValues = ListUtils.unwrapList(node.base.partbound.lowerdatums)
+            .map(datum => this.visit(datum, context))
+            .join(', ');
+          output.push(`(${lowerValues})`);
+        }
+        if (node.base.partbound.upperdatums) {
+          output.push('TO');
+          const upperValues = ListUtils.unwrapList(node.base.partbound.upperdatums)
+            .map(datum => this.visit(datum, context))
+            .join(', ');
+          output.push(`(${upperValues})`);
+        }
+      } else if (node.base.partbound.strategy === 'h' && node.base.partbound.modulus !== undefined) {
+        output.push('FOR VALUES WITH');
+        const remainder = node.base.partbound.remainder !== undefined ? node.base.partbound.remainder : 0;
+        output.push(`(MODULUS ${node.base.partbound.modulus}, REMAINDER ${remainder})`);
+      } else if (node.base.partbound.is_default) {
+        output.push('DEFAULT');
+      }
+    } else if (node.base && node.base.inhRelations && node.base.inhRelations.length > 0) {
       const inheritStrs = ListUtils.unwrapList(node.base.inhRelations).map(rel => this.visit(rel, context));
       output.push(`INHERITS (${inheritStrs.join(', ')})`);
     }
