@@ -1731,8 +1731,7 @@ export class Deparser implements DeparserVisitor {
     const PG_NATIVE_TYPES = new Set([
       'text', 'int', 'integer', 'bigint', 'smallint',
       'bool', 'boolean', 'date', 'time', 'timestamp',
-      'interval', 'numeric', 'json', 'jsonb', 'regclass',
-      'box', 'point', 'polygon', 'circle', 'line', 'lseg', 'path'
+      'interval', 'numeric', 'json', 'jsonb'
     ]);
 
     function isPgNativeType(typeName: string): boolean {
