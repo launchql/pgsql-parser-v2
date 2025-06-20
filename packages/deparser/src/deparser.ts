@@ -2022,6 +2022,12 @@ export class Deparser implements DeparserVisitor {
       }
     }
 
+    // Handle access method (USING access_method)
+    if (node.accessMethod) {
+      output.push('USING');
+      output.push(this.quoteIfNeeded(node.accessMethod));
+    }
+
     // Handle table options like WITH (fillfactor=10)
     if (node.options && node.options.length > 0) {
       const createStmtContext = { ...context, parentNodeTypes: [...context.parentNodeTypes, 'CreateStmt'] };
@@ -3350,6 +3356,14 @@ export class Deparser implements DeparserVisitor {
           const nodeData = this.getNodeData(arg);
           if (nodeData.sval !== undefined) {
             const svalValue = typeof nodeData.sval === 'object' ? nodeData.sval.sval : nodeData.sval;
+            // Handle empty strings explicitly
+            if (svalValue === '') {
+              return "''";
+            }
+            // Always quote timezone values with special characters like colons and plus signs
+            if (node.name === 'timezone' && (svalValue.includes(':') || svalValue.includes('+') || svalValue.includes('-'))) {
+              return `"${svalValue}"`;
+            }
             if (svalValue.includes(' ') || svalValue.includes('-') || /[A-Z]/.test(svalValue) || /^\d/.test(svalValue) || svalValue.includes('.') || svalValue.includes('$')) {
               return `"${svalValue}"`;
             }
@@ -4343,6 +4357,8 @@ export class Deparser implements DeparserVisitor {
           output.push('SET ACCESS METHOD');
           if (node.name) {
             output.push(QuoteUtils.quote(node.name));
+          } else {
+            output.push('DEFAULT');
           }
           break;
         case 'AT_EnableRowSecurity':
@@ -5843,6 +5859,9 @@ export class Deparser implements DeparserVisitor {
         case 'OBJECT_TSCONFIGURATION':
           output.push('TEXT SEARCH CONFIGURATION');
           break;
+        case 'OBJECT_TRANSFORM':
+          output.push('TRANSFORM');
+          break;
         default:
           output.push(node.objtype.replace('OBJECT_', ''));
       }
@@ -5934,6 +5953,17 @@ export class Deparser implements DeparserVisitor {
               output.push(policy);
               output.push('ON');
               output.push(table);
+            } else {
+              output.push(objectParts.join('.'));
+            }
+          } else if (node.objtype === 'OBJECT_TRANSFORM') {
+            // Handle TRANSFORM syntax: COMMENT ON TRANSFORM FOR type_name LANGUAGE language_name IS 'comment'
+            if (objectParts.length === 2) {
+              const [typeName, languageName] = objectParts;
+              output.push('FOR');
+              output.push(typeName);
+              output.push('LANGUAGE');
+              output.push(languageName);
             } else {
               output.push(objectParts.join('.'));
             }
@@ -8613,6 +8643,11 @@ export class Deparser implements DeparserVisitor {
           output.push('DROP');
           break;
       }
+    }
+    
+    if (node.into && node.into.accessMethod) {
+      output.push('USING');
+      output.push(this.quoteIfNeeded(node.into.accessMethod));
     }
     
     output.push('AS');
