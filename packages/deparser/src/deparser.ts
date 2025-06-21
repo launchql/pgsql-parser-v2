@@ -386,6 +386,8 @@ export class Deparser implements DeparserVisitor {
           let leftExpr = this.visit(lexpr, context);
           let rightExpr = this.visit(rexpr, context);
           
+
+          
           // Check if left expression needs parentheses
           let leftNeedsParens = false;
           if (lexpr && 'A_Expr' in lexpr && lexpr.A_Expr?.kind === 'AEXPR_OP') {
@@ -973,16 +975,15 @@ export class Deparser implements DeparserVisitor {
     if (context.bool) {
       formatStr = '(%s)';
     }
-    
     const boolContext = { ...context, bool: true };
 
     switch (boolop) {
       case 'AND_EXPR':
         const andArgs = args.map(arg => this.visit(arg, boolContext)).join(' AND ');
-        return formatStr.replace('%s', andArgs);
+        return formatStr.replace('%s', () => andArgs);
       case 'OR_EXPR':
         const orArgs = args.map(arg => this.visit(arg, boolContext)).join(' OR ');
-        return formatStr.replace('%s', orArgs);
+        return formatStr.replace('%s', () => orArgs);
       case 'NOT_EXPR':
         return `NOT (${this.visit(args[0], context)})`;
       default:
