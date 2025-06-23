@@ -1227,6 +1227,16 @@
     node-addon-api "^3.2.1"
     node-gyp-build "^4.3.0"
 
+"@pgsql/parser@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@pgsql/parser/-/parser-1.0.0.tgz#5873444ad033b079c7bfe45e6c4d4c0adf020f7e"
+  integrity sha512-clOjRiq/s4kbt7LmqGJzqMuiq8RVox5bLkfFRKAZUtg9gYTl7Y9tUNaom6n5fiy12PcI1eOpc0wVzNZ5xOa1FA==
+
+"@pgsql/types@^13.11.1":
+  version "13.11.1"
+  resolved "https://registry.yarnpkg.com/@pgsql/types/-/types-13.11.1.tgz#f822e09bbb553d9a444ced7ad67f4526c8ba389f"
+  integrity sha512-5JeN7DZYCVbxPPFI47Z370Jzr3eHZpqgwCdutYWV8e8XtuhxF7UuvWvOsx2oPJe9KnQen0vzJWnVq/61bRvxmw==
+
 "@pgsql/types@^17.6.1":
   version "17.6.1"
   resolved "https://registry.yarnpkg.com/@pgsql/types/-/types-17.6.1.tgz#fcbe4910321bd0dfa38aa0c26d87eff7b098d0e9"
@@ -4567,6 +4577,13 @@ libpg-query@17.5.2:
   integrity sha512-9VhuzWrWyZ6AalSCtF2+BDx/aHpp8JKLAsYa1qF77x7f+kJ5BxAXvdRYOduNNFqdwu67110eFpoBr6BtN4WH/A==
   dependencies:
     "@pgsql/types" "^17.6.1"
+
+libpg-query@^13.5.2:
+  version "13.5.2"
+  resolved "https://registry.yarnpkg.com/libpg-query/-/libpg-query-13.5.2.tgz#138ec937891722097bae7785f5696d0f12781711"
+  integrity sha512-fy5fB2+zt4ITNf1NhujlUZ/MuV12R5KvVKZDcCdCY1dtSdb3Im4ePPVqR3p4+MS9dG96Dzg2cUSkmvrePKjqPQ==
+  dependencies:
+    "@pgsql/types" "^13.11.1"
 
 lines-and-columns@^1.1.6:
   version "1.2.4"
