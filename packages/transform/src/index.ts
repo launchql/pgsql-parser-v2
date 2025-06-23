@@ -329,6 +329,9 @@ export function transformPG13ToPG17(node: PG13Node): PG17Node {
   if ('MergeAction' in node) {
     return { MergeAction: transformMergeAction(node.MergeAction) };
   }
+  if ('SelectStmt' in node) {
+    return { SelectStmt: transformSelectStmt(node.SelectStmt) };
+  }
 
   throw new Error(`Unknown node type: ${JSON.stringify(node)}`);
 }
@@ -1411,8 +1414,41 @@ function transformMergeAction(mergeAction: PG13Types.MergeAction): PG17Types.Mer
   };
 }
 
+function transformSelectStmt(selectStmt: PG13Types.SelectStmt): PG17Types.SelectStmt {
+  return {
+    distinctClause: transformNodeArray(selectStmt.distinctClause),
+    intoClause: selectStmt.intoClause ? transformIntoClause(selectStmt.intoClause) : undefined,
+    targetList: transformNodeArray(selectStmt.targetList),
+    fromClause: transformNodeArray(selectStmt.fromClause),
+    whereClause: transformOptionalNode(selectStmt.whereClause),
+    groupClause: transformNodeArray(selectStmt.groupClause),
+    groupDistinct: selectStmt.groupDistinct,
+    havingClause: transformOptionalNode(selectStmt.havingClause),
+    windowClause: transformNodeArray(selectStmt.windowClause),
+    valuesLists: transformNodeArray(selectStmt.valuesLists),
+    sortClause: transformNodeArray(selectStmt.sortClause),
+    limitOffset: transformOptionalNode(selectStmt.limitOffset),
+    limitCount: transformOptionalNode(selectStmt.limitCount),
+    limitOption: selectStmt.limitOption,
+    lockingClause: transformNodeArray(selectStmt.lockingClause),
+    withClause: selectStmt.withClause ? transformWithClause(selectStmt.withClause) : undefined,
+    op: selectStmt.op,
+    all: selectStmt.all,
+    larg: selectStmt.larg ? transformSelectStmt(selectStmt.larg) : undefined,
+    rarg: selectStmt.rarg ? transformSelectStmt(selectStmt.rarg) : undefined
+  };
+}
+
 function transformTableSampleClause(tableSampleClause: PG13Types.TableSampleClause): PG17Types.TableSampleClause {
   return tableSampleClause as PG17Types.TableSampleClause;
+}
+
+function transformWithClause(withClause: PG13Types.WithClause): PG17Types.WithClause {
+  return {
+    ctes: transformNodeArray(withClause.ctes),
+    recursive: withClause.recursive,
+    location: withClause.location
+  };
 }
 
 export { Node as PG13Node } from './13/types';
